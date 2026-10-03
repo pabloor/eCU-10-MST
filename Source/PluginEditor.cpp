@@ -647,6 +647,7 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
         addAndMakeVisible (toggles[b]);
 
         soloButton[b].setButtonText ("S");
+        soloButton[b].setComponentID ("solo" + juce::String (b));
         soloButton[b].setTooltip (EQ::utf8 ("Solo: escuchas únicamente lo que toca esta banda (en un paso alto o bajo, lo que recorta)."));
         soloButton[b].onClick = [this, b]
         {
@@ -863,6 +864,7 @@ void MedidoresEQAudioProcessorEditor::applyBandColours()
     for (auto* k : { &inKnob, &outKnob, &driveKnob, &mixKnob, &monoKnob, &widthKnob }) styleKnob (*k);
     bypassToggle.setColour (juce::ToggleButton::tickColourId, P.vuRed.brighter (0.3f));
     autoGainToggle.setColour (juce::ToggleButton::tickColourId, P.accent);
+    for (auto& sb : slotButton) sb.setColour (juce::TextButton::buttonOnColourId, P.accent);
     for (auto* s : { characterSwitch.get(), styleSwitch.get(), phaseSwitch.get(), ditherSwitch.get() })
         if (s != nullptr) s->setCapColour (P.accent);
 }
@@ -888,6 +890,7 @@ void MedidoresEQAudioProcessorEditor::addKnob (Knob& k, const juce::String& id, 
     k.slider.setTooltip (tip + EQ::utf8 (" Doble clic: valor por defecto. Mayús + arrastrar: ajuste fino. Clic en el valor: escribir un número."));
     k.label.setText (text.toUpperCase(), juce::dontSendNotification);
     k.label.setJustificationType (juce::Justification::centred);
+    k.label.setInterceptsMouseClicks (false, false);
     k.attachment = std::make_unique<SliderAttachment> (proc.apvts, id, k.slider);
     if (auto* p = proc.apvts.getParameter (id))
         k.slider.setDoubleClickReturnValue (true, p->convertFrom0to1 (p->getDefaultValue()));
@@ -904,6 +907,7 @@ void MedidoresEQAudioProcessorEditor::addGainKnob (Knob& k, int b, const juce::S
     k.slider.setTooltip (tip + EQ::utf8 (" Doble clic: 0 dB. Mayús + arrastrar: ajuste fino. Clic en el valor: escribir un número."));
     k.label.setText ("GAN", juce::dontSendNotification);
     k.label.setJustificationType (juce::Justification::centred);
+    k.label.setInterceptsMouseClicks (false, false);
     gainAttachments[b] = std::make_unique<RangedSliderAttachment> (*proc.apvts.getParameter (EQ::gainId (b)), k.slider);
     styleKnob (k);
     addAndMakeVisible (k.slider);
@@ -1149,6 +1153,7 @@ void MedidoresEQAudioProcessorEditor::resized()
             toggles[b].setBounds (x + 8, blockTop + 2, colW - 12, 26);
             place (knobs[b][0], { x, blockTop + 34, colW, knobH });
             soloButton[b].setBounds (x + colW - 26, blockTop + 34, 22, 15);
+            soloButton[b].toFront (false);
             slopeButtons[b]->setBounds (x + 8, blockTop + 34 + knobH + 8, colW - 16, 24);
             continue;
         }
@@ -1158,6 +1163,7 @@ void MedidoresEQAudioProcessorEditor::resized()
         place (knobs[b][1], { x, area.getY() + rowH, colW, rowH });
         place (knobs[b][2], { x, area.getY() + 2 * rowH, colW, rowH });
         soloButton[b].setBounds (x + colW - 26, area.getY(), 22, 15);
+        soloButton[b].toFront (false);
 
         dynToggle[b].setBounds (x + 8, dynRow.getY() + 2, colW - 12, 26);
         dynMeter[b]->setBounds (x + 10, dynRow.getY() + 30, colW - 20, 16);

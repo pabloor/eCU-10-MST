@@ -1,6 +1,7 @@
 // Pruebas funcionales del procesado: respuesta de cada modo de fase, canales Mid/Side/L/R, graves en mono, anchura,
 // dinámica (compresión y expansión), solo de banda, medición (LUFS, true peak, correlación) y cambio de ranuras A/B.
 #include "PluginProcessor.h"
+#include "PluginEditor.h"
 
 static void setParam (MedidoresEQAudioProcessor& p, const juce::String& id, float value)
 {
@@ -276,6 +277,32 @@ int main()
                                  : "detector externo: el sidechain fuerte activa la dinamica en la señal floja",
                    external == 0 ? std::abs (g) < 1.0 : g < -5.0, g);
         }
+    }
+
+    // 11. Botones de solo del editor: reciben el clic, activan el solo y se marcan
+    {
+        MedidoresEQAudioProcessor proc;
+        proc.setRateAndBufferSizeDetails (Rig::sr, Rig::block);
+        proc.prepareToPlay (Rig::sr, Rig::block);
+        std::unique_ptr<juce::AudioProcessorEditor> editor (proc.createEditor());
+        editor->setVisible (true);
+        bool allOk = true;
+        for (int b = 0; b < EQ::NumBands; ++b)
+        {
+            auto* btn = dynamic_cast<juce::Button*> (editor->findChildWithID ("solo" + juce::String (b)));
+            if (btn == nullptr) { allOk = false; continue; }
+            const auto centre = editor->getLocalPoint (btn, btn->getLocalBounds().getCentre());
+            const bool reachable = editor->getComponentAt (centre) == btn;   // nada tapa el botón
+            btn->onClick();   // lo que ejecuta el clic (triggerClick es asíncrono)
+            const bool engaged = (int) proc.apvts.getRawParameterValue ("solo")->load() == b + 1 && btn->getToggleState();
+            btn->onClick();   // segundo clic: lo apaga
+            const bool released = (int) proc.apvts.getRawParameterValue ("solo")->load() == 0 && ! btn->getToggleState();
+            if (! (reachable && engaged && released)) { allOk = false;
+                auto* at = editor->getComponentAt (centre);
+                std::printf ("  btn bounds %d,%d %dx%d visible=%d showing=%d enabled=%d centre=%d,%d  en el punto: %s (%d,%d %dx%d) solo=%d\n", btn->getX(), btn->getY(), btn->getWidth(), btn->getHeight(), btn->isVisible(), btn->isShowing(), btn->isEnabled(), centre.x, centre.y,
+                             at ? at->getComponentID().toRawUTF8() : "-", at ? at->getX() : 0, at ? at->getY() : 0, at ? at->getWidth() : 0, at ? at->getHeight() : 0, (int) proc.apvts.getRawParameterValue ("solo")->load()); std::printf ("  solo banda %d: alcanzable=%d activa=%d apaga=%d\n", b, reachable, engaged, released); }
+        }
+        check ("botones S del editor: clic alcanza, activa, marca y apaga", allOk);
     }
 
     std::printf ("%s\n", failures == 0 ? "Todas las pruebas funcionales correctas" : "HAY PRUEBAS FALLIDAS");

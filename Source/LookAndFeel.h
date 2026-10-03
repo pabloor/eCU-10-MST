@@ -190,6 +190,13 @@ public:
         g.fillRoundedRectangle (r, 4.0f);
         g.setColour (juce::Colours::black.withAlpha (0.7f));
         g.drawRoundedRectangle (r, 4.0f, 1.0f);
+        if (on && ! b.getClickingTogglesState())   // pulsadores de selección (solo, A/B/C/D): el activo se enciende con su color
+        {
+            g.setColour (b.findColour (juce::TextButton::buttonOnColourId).withAlpha (0.85f));
+            g.fillRoundedRectangle (r, 4.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.55f));
+            g.drawRoundedRectangle (r, 4.0f, 1.0f);
+        }
         g.setColour (juce::Colours::white.withAlpha (pressed ? 0.04f : 0.14f));
         g.drawLine (r.getX() + 4.0f, r.getY() + 1.5f, r.getRight() - 4.0f, r.getY() + 1.5f, 1.0f);
         if (highlighted)
@@ -215,7 +222,8 @@ public:
     {
         auto r = b.getLocalBounds().toFloat();
         if (b.getClickingTogglesState()) r = r.withTrimmedLeft (18.0f);
-        g.setColour (palette->ink.withAlpha (b.isEnabled() ? 1.0f : 0.4f));
+        const bool lit = b.getToggleState() && ! b.getClickingTogglesState();
+        g.setColour (lit ? juce::Colour (0xff15130f) : palette->ink.withAlpha (b.isEnabled() ? 1.0f : 0.4f));
         g.setFont (getTextButtonFont (b, b.getHeight()));
         g.drawText (b.getButtonText(), r, juce::Justification::centred, true);
     }
