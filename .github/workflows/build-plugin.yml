@@ -1,0 +1,85 @@
+name: Construir plugin eCU-10 MST
+# Solo a mano (pestaña Actions → Run workflow): los minutos de macOS cuentan x10.
+on:
+  workflow_dispatch:
+    inputs:
+      universal:
+        description: 'Compilar también para Intel (tarda más)'
+        type: boolean
+        default: false
+      screenshot:
+        description: 'Generar capturas de la interfaz (una por tema) y guardarlas en docs/'
+        type: boolean
+        default: false
+permissions:
+  contents: write
+concurrency:
+  group: build-plugin
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      ARCHS: ${{ inputs.universal && 'arm64;x86_64' || 'arm64' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ env.ARCHS }}
+          max-size: 500M
+      - name: Configurar
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          "-DCMAKE_OSX_ARCHITECTURES=$ARCHS"
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache
+      - name: Compilar (solo AU y VST3)
+        run: cmake --build build --config Release --parallel --target eCU10MST_AU eCU10MST_VST3
+      - name: Prueba de latencia
+        run: |
+          cmake --build build --config Release --parallel --target EQLatencyTest
+          set -o pipefail   # que el fallo de la prueba no lo oculte tee
+          mkdir -p docs
+          "$(find build -type f -name EQLatencyTest | head -1)" | tee docs/latencia.txt
+      - name: Pruebas funcionales
+        run: |
+          cmake --build build --config Release --parallel --target EQFeatureTest
+          set -o pipefail
+          mkdir -p docs
+          "$(find build -type f -name EQFeatureTest | head -1)" | tee docs/pruebas.txt
+      - name: Captura de la interfaz
+        if: ${{ inputs.screenshot }}
+        run: |
+          cmake --build build --config Release --parallel --target EQScreenshot
+          BIN=$(find build -type f -name EQScreenshot | head -1)
+          mkdir -p docs
+          "$BIN" docs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/*
+          git commit -m "Captura de la interfaz" || true
+          git push origin HEAD:main
+      - name: Validar el Audio Unit (auval)
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "build/eCU10MST_artefacts/Release/AU/eCU-10 MST.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aufx Ecm1 Polv || { echo "auval falló"; sleep 10; ls ~/Library/Logs/DiagnosticReports; cat ~/Library/Logs/DiagnosticReports/auval* 2>/dev/null | head -80; exit 1; }
+      - name: Validar con pluginval (VST3)
+        run: |
+          curl -sL https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip -o pluginval.zip
+          unzip -q pluginval.zip
+          pluginval.app/Contents/MacOS/pluginval --strictness-level 5 --validate-in-process --output-dir pluginval-log "build/eCU10MST_artefacts/Release/VST3/eCU-10 MST.vst3"
+      - name: Empaquetar
+        if: always()
+        run: |
+          cd build/eCU10MST_artefacts/Release
+          ditto -c -k --keepParent "AU/eCU-10 MST.component" "$GITHUB_WORKSPACE/eCU-10-MST-AU.zip"
+          ditto -c -k --keepParent "VST3/eCU-10 MST.vst3" "$GITHUB_WORKSPACE/eCU-10-MST-VST3.zip"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eCU-10-MST
+          path: eCU-10-MST-*.zip
+          retention-days: 14

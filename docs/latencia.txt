@@ -1,0 +1,20 @@
+limpio 48k                    48000 Hz  informada =    31  medida =    31  ganancia = 1.000  OK
+cinta drive 0                 48000 Hz  informada =    31  medida =    31  ganancia = 1.000  OK
+cinta drive 60                48000 Hz  informada =    31  medida =    31  ganancia = 1.708  OK
+valvula drive 60              48000 Hz  informada =    31  medida =    31  ganancia = 1.630  OK
+cinta mezcla 50               48000 Hz  informada =    31  medida =    31  ganancia = 1.354  OK
+valvula mezcla 0              48000 Hz  informada =    31  medida =    31  ganancia = 1.000  OK
+4x limpio                     48000 Hz  informada =    38  medida =    38  ganancia = 1.000  OK
+4x cinta drive 60             48000 Hz  informada =    38  medida =    38  ganancia = 1.707  OK
+4x valvula mezcla 40          48000 Hz  informada =    38  medida =    38  ganancia = 1.252  OK
+fase natural                  48000 Hz  informada =  8223  medida =  8223  ganancia = 1.000  OK
+fase lineal                   48000 Hz  informada =  8223  medida =  8223  ganancia = 1.000  OK
+lineal + cinta                48000 Hz  informada =  8223  medida =  8223  ganancia = 1.708  OK
+lineal + 4x valvula mix 30    48000 Hz  informada =  8230  medida =  8230  ganancia = 1.189  OK
+bypass minima                 48000 Hz  informada =    31  medida =    31  ganancia = 1.000  OK
+bypass lineal                 48000 Hz  informada =  8223  medida =  8223  ganancia = 1.000  OK
+lineal 44.1k                  44100 Hz  informada =  8223  medida =  8223  ganancia = 1.000  OK
+lineal 96k                    96000 Hz  informada = 16415  medida = 16415  ganancia = 1.000  OK
+lineal 192k                  192000 Hz  informada = 32799  medida = 32799  ganancia = 1.000  OK
+4x + lineal 192k             192000 Hz  informada = 32806  medida = 32806  ganancia = 1.707  OK
+Latencia coherente en todos los casos
