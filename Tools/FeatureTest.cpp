@@ -236,6 +236,48 @@ int main()
         check ("  y la otra ranura", std::abs (other.apvts.getRawParameterValue ("in_gain")->load() - 3.0f) < 0.05f);
     }
 
+
+    // 10. Sidechain externo: la dinámica reacciona a la entrada de sidechain, no a la señal principal
+    {
+        for (int external = 0; external < 2; ++external)
+        {
+            MedidoresEQAudioProcessor proc;
+            juce::AudioProcessor::BusesLayout layout;
+            layout.inputBuses.add (juce::AudioChannelSet::stereo());
+            layout.inputBuses.add (juce::AudioChannelSet::stereo());
+            layout.outputBuses.add (juce::AudioChannelSet::stereo());
+            const bool accepted = proc.setBusesLayout (layout);
+            if (external == 0) check ("el plugin acepta la entrada de sidechain", accepted);
+            setParam (proc, "hp_on", 0.0f); setParam (proc, "lp_on", 0.0f);
+            setParam (proc, "b2_freq", 1000.0f); setParam (proc, "b2_gain", -9.0f); setParam (proc, "style", 0.0f);
+            setParam (proc, "b2_dyn", 1.0f); setParam (proc, "b2_thr", -30.0f); setParam (proc, "b2_ratio", 10.0f);
+            setParam (proc, "b2_attack", 1.0f); setParam (proc, "b2_release", 50.0f);
+            setParam (proc, "dyn_sc", (float) external);
+            proc.setRateAndBufferSizeDetails (Rig::sr, Rig::block);
+            proc.prepareToPlay (Rig::sr, Rig::block);
+
+            // Principal: seno flojo (-50 dBFS) a 1 kHz. Sidechain: seno fuerte (-10 dBFS) a 1 kHz.
+            std::vector<float> out;
+            for (int b = 0; b < 60; ++b)
+            {
+                juce::AudioBuffer<float> buf (4, Rig::block);
+                for (int i = 0; i < Rig::block; ++i)
+                {
+                    const double ph = 2.0 * juce::MathConstants<double>::pi * 1000.0 * (b * Rig::block + i) / Rig::sr;
+                    buf.setSample (0, i, (float) (0.003 * std::sin (ph))); buf.setSample (1, i, (float) (0.003 * std::sin (ph)));
+                    buf.setSample (2, i, (float) (0.3 * std::sin (ph)));   buf.setSample (3, i, (float) (0.3 * std::sin (ph)));
+                }
+                juce::MidiBuffer midi;
+                proc.processBlock (buf, midi);
+                for (int i = 0; i < Rig::block; ++i) out.push_back (buf.getSample (0, i));
+            }
+            const double g = dbOf (rmsOf (out, out.size() - 8192, out.size()) / (0.003 / std::sqrt (2.0)));
+            check (external == 0 ? "detector interno: la señal floja no activa la dinamica"
+                                 : "detector externo: el sidechain fuerte activa la dinamica en la señal floja",
+                   external == 0 ? std::abs (g) < 1.0 : g < -5.0, g);
+        }
+    }
+
     std::printf ("%s\n", failures == 0 ? "Todas las pruebas funcionales correctas" : "HAY PRUEBAS FALLIDAS");
     return failures == 0 ? 0 : 1;
 }
