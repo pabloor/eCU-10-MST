@@ -5,9 +5,8 @@ ResponseCurve::ResponseCurve (MedidoresEQAudioProcessor& p) : proc (p)
 {
     shown.fill (-120.0f);
     held.fill (-120.0f);
-    setTooltip (EQ::utf8 ("Arrastra un punto: frecuencia y ganancia (con Mayús, ajuste fino). Rueda sobre un punto: Q. "
-                          "Doble clic en un punto: activar o desactivar la banda. "
-                          "Las asas laterales de la banda enfocada cambian su ancho (Q)."));
+    setTooltip ("Drag a point: frequency and gain (hold Shift for fine adjustment). Mouse wheel over a point: Q. "
+                "Double-click a point: band on/off. The side handles of the focused band change its width (Q).");
     startTimerHz (30);
 }
 
@@ -361,7 +360,7 @@ void ResponseCurve::paint (juce::Graphics& g)
         const int lat = proc.getLatencySamples();
         g.setFont (juce::Font (juce::FontOptions (11.0f, juce::Font::bold)));
         g.setColour (P.accent.withAlpha (0.9f));
-        g.drawText (juce::String (phase == 1 ? "FASE NATURAL" : "FASE LINEAL") + "  " + juce::String (lat) + " muestras ("
+        g.drawText (juce::String (phase == 1 ? "NATURAL PHASE" : "LINEAR PHASE") + "  " + juce::String (lat) + " samples ("
                         + juce::String (1000.0 * lat / sr, 0) + " ms)",
                     area.toNearestInt().withTrimmedRight (10).removeFromTop (22), juce::Justification::centredRight);
     }
@@ -581,14 +580,14 @@ void DynMeter::paint (juce::Graphics& g)
 
     g.setColour (juce::Colours::white.withAlpha (on ? 1.0f : 0.4f));
     g.setFont (11.0f);
-    g.drawText (on ? juce::String (liveDb, 1) + " / " + juce::String (maxDb, 1) + " dB" : juce::String ("apagada"),
+    g.drawText (on ? juce::String (liveDb, 1) + " / " + juce::String (maxDb, 1) + " dB" : juce::String ("off"),
                 getLocalBounds(), juce::Justification::centred);
 }
 
 //==============================================================================
 //==============================================================================
 MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAudioProcessor& p)
-    : AudioProcessorEditor (&p), proc (p), presets (p.apvts), curve (p), inVU (p, true), outVU (p, false), meterPanel (p)
+    : AudioProcessorEditor (&p), proc (p), presets (p.apvts), curve (p), inMeter (p, true), outMeter (p, false), meterPanel (p)
 {
     laf.setPalette (Themes::get());
     setLookAndFeel (&laf);
@@ -597,8 +596,8 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
     addAndMakeVisible (presetBox);
     addAndMakeVisible (saveButton);
     addAndMakeVisible (deleteButton);
-    presetBox.setTooltip (EQ::utf8 ("Presets de fábrica y de usuario."));
-    saveButton.setTooltip (EQ::utf8 ("Guarda los ajustes actuales como preset de usuario."));
+    presetBox.setTooltip ("Factory and user presets.");
+    saveButton.setTooltip ("Save the current settings as a user preset.");
     presetBox.onChange = [this] { presetChosen(); };
     saveButton.onClick = [this] { askPresetName(); };
     deleteButton.onClick = [this] { askDeletePreset(); };
@@ -608,13 +607,13 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
     for (int i = 0; i < 4; ++i)
     {
         slotButton[i].setButtonText (juce::String::charToString ((juce::juce_wchar) ('A' + i)));
-        slotButton[i].setTooltip (EQ::utf8 ("Ranura de ajustes A/B/C/D: guarda el estado actual y carga el de la ranura. "
-                                            "Una ranura vacía parte de los ajustes actuales, así se compara un retoque con el original."));
+        slotButton[i].setTooltip ("Settings slot A/B/C/D: stores the current state and loads the slot's. "
+                                  "An empty slot starts from the current settings, so you can compare a tweak with the original.");
         slotButton[i].onClick = [this, i] { proc.switchSlot (i); };
         addAndMakeVisible (slotButton[i]);
     }
-    undoButton.setTooltip (EQ::utf8 ("Deshace el último cambio de ajustes."));
-    redoButton.setTooltip (EQ::utf8 ("Rehace el cambio deshecho."));
+    undoButton.setTooltip ("Undo the last settings change.");
+    redoButton.setTooltip ("Redo the undone change.");
     undoButton.onClick = [this] { proc.undoManager.undo(); };
     redoButton.onClick = [this] { proc.undoManager.redo(); };
     addAndMakeVisible (undoButton);
@@ -627,77 +626,77 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
     addCombo (smoothBox, smoothAttachment, EQ::analyzerSmoothId, EQ::analyzerSmoothNames());
     addCombo (holdBox, holdAttachment, EQ::analyzerHoldId, EQ::holdNames());
     addCombo (rangeBox, rangeAttachment, EQ::rangeId, EQ::rangeNames());
-    analyzerBox.setTooltip (EQ::utf8 ("Analizador de espectro: apagado, después del EQ (post) o antes (pre)."));
-    speedBox.setTooltip (EQ::utf8 ("Rapidez con la que se actualiza el espectro."));
-    resBox.setTooltip (EQ::utf8 ("Resolución del analizador (tamaño de la FFT): la fina y la máxima separan mejor los graves."));
-    smoothBox.setTooltip (EQ::utf8 ("Suavizado del espectro por fracciones de octava."));
-    holdBox.setTooltip (EQ::utf8 ("Con pico: una línea fina mantiene el máximo alcanzado (se borra al cambiar de opción)."));
-    rangeBox.setTooltip (EQ::utf8 ("Rango vertical de la curva (solo cambia lo que se ve)."));
+    analyzerBox.setTooltip ("Spectrum analyzer: off, after the EQ (post) or before it (pre).");
+    speedBox.setTooltip ("How fast the spectrum updates.");
+    resBox.setTooltip ("Analyzer resolution (FFT size): Fine and Max separate the low end better.");
+    smoothBox.setTooltip ("Spectrum smoothing in fractions of an octave.");
+    holdBox.setTooltip ("Peak hold: a thin line keeps the maximum reached (cleared when you change the option).");
+    rangeBox.setTooltip ("Vertical range of the curve (only changes what you see).");
 
     addAndMakeVisible (curve);
-    addAndMakeVisible (inVU);
-    addAndMakeVisible (outVU);
+    addAndMakeVisible (inMeter);
+    addAndMakeVisible (outMeter);
     addAndMakeVisible (meterPanel);
 
     for (int b = 0; b < EQ::NumBands; ++b)
     {
         toggles[b].setButtonText (EQ::bands[b].name);
-        toggles[b].setTooltip (EQ::utf8 ("Activa o desactiva la banda."));
+        toggles[b].setTooltip ("Turns the band on or off.");
         toggleAttachments[b] = std::make_unique<ButtonAttachment> (proc.apvts, EQ::onId (b), toggles[b]);
         addAndMakeVisible (toggles[b]);
 
         soloButton[b].setButtonText ("S");
         soloButton[b].setComponentID ("solo" + juce::String (b));
-        soloButton[b].setTooltip (EQ::utf8 ("Solo: escuchas únicamente lo que toca esta banda (en un paso alto o bajo, lo que recorta)."));
+        soloButton[b].setTooltip ("Solo: you only hear what this band touches (for a high/low-pass, the part it cuts).");
         soloButton[b].onClick = [this, b]
         {
             if (soloAttachment != nullptr) soloAttachment->setValueAsCompleteGesture (soloIndex == b + 1 ? 0.0f : (float) (b + 1));
         };
         addAndMakeVisible (soloButton[b]);
 
-        addKnob (knobs[b][0], EQ::freqId (b), "Frec", 70, b, EQ::utf8 ("Frecuencia de la banda."));
+        addKnob (knobs[b][0], EQ::freqId (b), "Freq", 70, b, "Band frequency.");
         if (EQ::isCut (b))
         {
             slopeButtons[b] = std::make_unique<SegmentedButtons> (*proc.apvts.getParameter (EQ::slopeId (b)),
                                                                   juce::StringArray { "6", "12", "24", "48" }, P.band[(size_t) b]);
-            slopeButtons[b]->setTooltip (EQ::utf8 ("Pendiente del filtro en dB por octava: más dB, corte más brusco."));
+            slopeButtons[b]->setTooltip ("Filter slope in dB per octave: more dB, steeper cut.");
             addAndMakeVisible (*slopeButtons[b]);
         }
         else
         {
-            addGainKnob (knobs[b][1], b, EQ::utf8 ("Ganancia de la banda. Con la dinámica activada es el máximo."));
-            addKnob (knobs[b][2], EQ::qId (b), "Q", 70, b, EQ::utf8 ("Ancho de la banda: más Q, más estrecha."));
+            addGainKnob (knobs[b][1], b, "Band gain. With dynamics on, this is the maximum.");
+            addKnob (knobs[b][2], EQ::qId (b), "Q", 70, b, "Band width: higher Q, narrower.");
 
             placementButtons[b] = std::make_unique<SegmentedButtons> (*proc.apvts.getParameter (EQ::chId (b)),
                                                                       juce::StringArray { "ST", "M", "S", "L", "R" }, P.band[(size_t) b]);
-            placementButtons[b]->setTooltip (EQ::utf8 ("Dónde actúa la banda: ST = estéreo completo, M = solo el Mid, S = solo el Side, "
-                                                       "L = solo el canal izquierdo, R = solo el derecho."));
+            placementButtons[b]->setTooltip ("Where the band acts: ST = full stereo, M = Mid only, S = Side only, "
+                                             "L = left channel only, R = right channel only.");
             addAndMakeVisible (*placementButtons[b]);
 
             typeButton[b] = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::typeId (b)), EQ::typeNames (b));
             typeButton[b]->setTooltip (EQ::isShelf (b)
-                ? EQ::utf8 ("Tipo: Shelf, Campana, Pultec (realce y atenuación a la vez; el knob Q pasa a ser la atenuación), "
-                            "Tilt (inclina todo el espectro alrededor de la frecuencia) o Baxandall (shelf suave de 6 dB/oct).")
-                : EQ::utf8 ("Tipo: Campana o Notch (muesca estrecha, sin ganancia)."));
+                ? juce::String ("Type: Shelf, Bell, Pultec (boost and cut at once; the Q knob becomes the cut), "
+                                "Tilt (tilts the whole spectrum around the frequency) or Baxandall (gentle 6 dB/oct shelf).")
+                : juce::String ("Type: Bell or Notch (narrow notch, no gain)."));
             typeButton[b]->onChanged = [this, b] (int type) { refreshTypeUi (b, type); };
             addAndMakeVisible (*typeButton[b]);
         }
 
         if (EQ::hasDyn (b))
         {
-            dynToggle[b].setButtonText (EQ::utf8 ("Dinámica"));
-            dynToggle[b].setTooltip (EQ::utf8 ("La ganancia solo se aplica cuando el nivel en esta banda supera el umbral (o queda por debajo, en expansión)."));
+            dynToggle[b].setButtonText ("Dynamic");
+            dynToggle[b].setTooltip ("The gain only applies when the level in this band goes above the threshold (or below it, in expand mode).");
             dynAttachments[b] = std::make_unique<ButtonAttachment> (proc.apvts, EQ::dynId (b), dynToggle[b]);
             addAndMakeVisible (dynToggle[b]);
             dynMeter[b] = std::make_unique<DynMeter> (proc, b);
             addAndMakeVisible (*dynMeter[b]);
             dmodeButton[b] = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::dmodeId (b)), EQ::dmodeNames());
-            dmodeButton[b]->setTooltip (EQ::utf8 ("Compresión: actúa al superar el umbral. Expansión: actúa cuando el nivel cae por debajo."));
+            dmodeButton[b]->setTooltip ("Compress: acts when the level goes above the threshold. Expand: acts when the level falls below it.");
             addAndMakeVisible (*dmodeButton[b]);
-            addKnob (thrKnob[b], EQ::thrId (b), "Umbral", 52, b, EQ::utf8 ("Nivel en la banda a partir del cual actúa la dinámica."));
-            addKnob (ratioKnob[b], EQ::ratioId (b), "Ratio", 52, b, EQ::utf8 ("Cuánto responde la dinámica al superar el umbral."));
-            addKnob (attackKnob[b], EQ::attackId (b), "Ataque", 52, b, EQ::utf8 ("Rapidez con la que la dinámica empieza a actuar."));
-            addKnob (releaseKnob[b], EQ::releaseId (b), "Release", 52, b, EQ::utf8 ("Rapidez con la que la banda vuelve a su ganancia normal."));
+            addKnob (thrKnob[b], EQ::thrId (b), "Thresh", 52, b, "Level in the band at which the dynamics start to act.");
+            addKnob (ratioKnob[b], EQ::ratioId (b), "Ratio", 52, b, "How strongly the dynamics respond past the threshold.");
+            addKnob (attackKnob[b], EQ::attackId (b), "Attack", 52, b, "How fast the dynamics start to act.");
+            addKnob (releaseKnob[b], EQ::releaseId (b), "Release", 52, b, "How fast the band returns to its normal gain.");
         }
     }
 
@@ -718,58 +717,58 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
     for (int b = 0; b < EQ::NumBands; ++b)
         if (typeButton[b] != nullptr) typeButton[b]->refresh();   // coloca el knob Q/atenuación y los activos según el tipo
 
-    addKnob (inKnob, EQ::inId, "Gan", 70, kAccent, EQ::utf8 ("Ganancia de entrada, antes del EQ."));
-    addKnob (outKnob, EQ::outId, "Gan", 70, kAccent, EQ::utf8 ("Ganancia de salida, después de la saturación."));
-    addKnob (driveKnob, EQ::driveId, "Drive", 70, kWarm, EQ::utf8 ("Cantidad de saturación (0 % = limpio)."));
-    addKnob (mixKnob, EQ::mixId, "Mezcla", 70, kWarm,
-             EQ::utf8 ("Mezcla entre la señal sin saturar y la saturada: por debajo de 100 % es saturación en paralelo."));
-    addKnob (monoKnob, EQ::monoFreqId, "Graves mono", 70, kAccent,
-             EQ::utf8 ("Por debajo de esta frecuencia el Side se elimina (graves en mono). Apagado al mínimo."));
-    addKnob (widthKnob, EQ::widthId, "Anchura", 70, kAccent, EQ::utf8 ("Anchura estéreo: 0 % mono, 100 % sin cambios, 200 % el doble de Side."));
+    addKnob (inKnob, EQ::inId, "Gain", 70, kAccent, "Input gain, before the EQ.");
+    addKnob (outKnob, EQ::outId, "Gain", 70, kAccent, "Output gain, after the saturation.");
+    addKnob (driveKnob, EQ::driveId, "Drive", 70, kWarm, "Amount of saturation (0 % = clean).");
+    addKnob (mixKnob, EQ::mixId, "Mix", 70, kWarm,
+             "Blend between the unsaturated and the saturated signal: below 100 % it is parallel saturation.");
+    addKnob (monoKnob, EQ::monoFreqId, "Bass mono", 70, kAccent,
+             "Below this frequency the Side is removed (mono bass). Off at the minimum.");
+    addKnob (widthKnob, EQ::widthId, "Width", 70, kAccent, "Stereo width: 0 % mono, 100 % unchanged, 200 % double Side.");
 
-    characterSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::characterId), EQ::utf8 ("SATURACIÓN"),
-                                                      juce::StringArray { "LIMPIO", "CINTA", EQ::utf8 ("VÁLV.") }, P.accent);
-    characterSwitch->setTooltip (EQ::utf8 ("Tipo de saturación: limpio, cinta o válvula."));
+    characterSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::characterId), "SATURATION",
+                                                      juce::StringArray { "CLEAN", "TAPE", "TUBE" }, P.accent);
+    characterSwitch->setTooltip ("Saturation type: clean, tape or tube.");
     addAndMakeVisible (*characterSwitch);
-    styleSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::styleId), "CURVAS",
-                                                  juce::StringArray { "MOD", EQ::utf8 ("CLÁS"), "AMER", "VINT" }, P.accent);
-    styleSwitch->setTooltip (EQ::utf8 ("Estilo de curva: Moderna (Q constante), Clásica (ancha al subir ganancia), Americana (estrecha al subir) o Vintage."));
+    styleSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::styleId), "CURVES",
+                                                  juce::StringArray { "MOD", "CLAS", "AMER", "VINT" }, P.accent);
+    styleSwitch->setTooltip ("Curve style: Modern (constant Q), Classic (wider as gain goes up), American (narrower as gain goes up) or Vintage.");
     addAndMakeVisible (*styleSwitch);
-    phaseSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::phaseId), "FASE",
-                                                  juce::StringArray { EQ::utf8 ("MÍN"), "NAT", "LIN" }, P.accent);
-    phaseSwitch->setTooltip (EQ::utf8 ("Fase del EQ: Mínima (sin latencia, como un EQ analógico), Natural (fase parcial: menos pre-eco que la lineal) "
-                                       "o Lineal (sin desfase entre frecuencias, con latencia). Las bandas dinámicas siempre son de fase mínima."));
+    phaseSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::phaseId), "PHASE",
+                                                  juce::StringArray { "MIN", "NAT", "LIN" }, P.accent);
+    phaseSwitch->setTooltip ("EQ phase: Minimum (no latency, like an analog EQ), Natural (partial phase: less pre-ringing than linear) "
+                             "or Linear (no phase shift between frequencies, with latency). Dynamic bands are always minimum phase.");
     addAndMakeVisible (*phaseSwitch);
     ditherSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::ditherId), "DITHER",
                                                    juce::StringArray { "OFF", "16", "24" }, P.accent);
-    ditherSwitch->setTooltip (EQ::utf8 ("Dither TPDF a la salida, por si el resultado se va a guardar a 16 o 24 bits."));
+    ditherSwitch->setTooltip ("TPDF dither at the output, for when the result will be saved at 16 or 24 bits.");
     addAndMakeVisible (*ditherSwitch);
 
     osButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::osId), EQ::osNames(), "Oversampling ");
-    osButton->setTooltip (EQ::utf8 ("Sobremuestreo de la saturación: 2x o 4x (más limpio, algo más de latencia y CPU)."));
+    osButton->setTooltip ("Saturation oversampling: 2x or 4x (cleaner, a little more latency and CPU).");
     addAndMakeVisible (*osButton);
-    gainRangeButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::gainRangeId), EQ::gainRangeNames(), "Rango ");
-    gainRangeButton->setTooltip (EQ::utf8 ("Rango de los knobs de ganancia: con ±6 o ±3 dB el mismo recorrido da más precisión."));
+    gainRangeButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::gainRangeId), EQ::gainRangeNames(), "Range ");
+    gainRangeButton->setTooltip ("Range of the gain knobs: with +/-6 or +/-3 dB the same travel gives more precision.");
     addAndMakeVisible (*gainRangeButton);
     scButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::scId), EQ::scNames(), "Detector ");
-    scButton->setTooltip (EQ::utf8 ("Señal que mide la dinámica: la propia (interno) o la entrada de sidechain del host (externo)."));
+    scButton->setTooltip ("Signal the dynamics listen to: the plugin's own (internal) or the host sidechain input (external).");
     addAndMakeVisible (*scButton);
-    detButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::detId), EQ::detNames(), "Medida ");
-    detButton->setTooltip (EQ::utf8 ("Medida del nivel en la dinámica: pico (rápida) o RMS (más suave, parecida al oído)."));
+    detButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::detId), EQ::detNames(), "Level ");
+    detButton->setTooltip ("Level detection in the dynamics: peak (fast) or RMS (smoother, closer to how we hear).");
     addAndMakeVisible (*detButton);
 
     bypassToggle.setButtonText ("Bypass");
-    bypassToggle.setTooltip (EQ::utf8 ("Compara con el original: el original se retrasa lo mismo que el procesado, así no hay saltos de tiempo."));
+    bypassToggle.setTooltip ("Compare with the original: the original is delayed by the same latency as the processed signal, so there is no time offset.");
     bypassAttachment = std::make_unique<ButtonAttachment> (proc.apvts, EQ::bypassId, bypassToggle);
     addAndMakeVisible (bypassToggle);
-    autoGainToggle.setButtonText ("Igualar vol.");
-    autoGainToggle.setTooltip (EQ::utf8 ("Compensa el volumen (loudness en 3 s) del procesado para que suene igual de fuerte que el original al comparar."));
+    autoGainToggle.setButtonText ("Match");
+    autoGainToggle.setTooltip ("Compensates the loudness (over 3 s) of the processed signal so it sounds as loud as the original when comparing.");
     autoGainAttachment = std::make_unique<ButtonAttachment> (proc.apvts, EQ::autoGainId, autoGainToggle);
     addAndMakeVisible (autoGainToggle);
 
     // Los ajustes de la dinámica (umbral, ratio, ataque, release) se despliegan: la ventana crece al abrirlos.
     dynOpen = (bool) proc.apvts.state.getProperty ("dynOpen", false);
-    dynExpandButton.setTooltip (EQ::utf8 ("Muestra u oculta los ajustes de la dinámica de cada banda. La ventana se agranda al desplegarlos."));
+    dynExpandButton.setTooltip ("Show or hide the dynamics settings of each band. The window grows when they are shown.");
     dynExpandButton.onClick = [this] { setDynamicsOpen (! dynOpen); };
     addAndMakeVisible (dynExpandButton);
 
@@ -802,7 +801,7 @@ void MedidoresEQAudioProcessorEditor::setDynamicsOpen (bool open)
 {
     dynOpen = open;
     proc.apvts.state.setProperty ("dynOpen", open, nullptr);
-    dynExpandButton.setButtonText (open ? EQ::utf8 ("▾  Ocultar ajustes de dinámica") : EQ::utf8 ("▸  Ajustes de dinámica"));
+    dynExpandButton.setButtonText (open ? EQ::utf8 ("▾  Hide dynamics settings") : EQ::utf8 ("▸  Dynamics settings"));
 
     for (int b = 0; b < EQ::NumBands; ++b)
         if (EQ::hasDyn (b))
@@ -829,9 +828,9 @@ void MedidoresEQAudioProcessorEditor::refreshTypeUi (int b, int type)
         qk.attachment = std::make_unique<SliderAttachment> (proc.apvts, pultec ? EQ::cutId (b) : EQ::qId (b), qk.slider);
         if (auto* prm = proc.apvts.getParameter (pultec ? EQ::cutId (b) : EQ::qId (b)))
             qk.slider.setDoubleClickReturnValue (true, prm->convertFrom0to1 (prm->getDefaultValue()));
-        qk.label.setText (pultec ? EQ::utf8 ("ATEN") : "Q", juce::dontSendNotification);
-        qk.slider.setTooltip (pultec ? EQ::utf8 ("Atenuación del Pultec, en la misma frecuencia que el realce. Doble clic: valor por defecto.")
-                                     : EQ::utf8 ("Ancho de la banda: más Q, más estrecha. Doble clic: valor por defecto."));
+        qk.label.setText (pultec ? "CUT" : "Q", juce::dontSendNotification);
+        qk.slider.setTooltip (pultec ? "Pultec cut, at the same frequency as the boost. Double-click: default value."
+                                     : "Band width: higher Q, narrower. Double-click: default value.");
         const bool enabled = type != 4;   // el Baxandall tiene la pendiente fija
         qk.slider.setEnabled (enabled);
         qk.label.setEnabled (enabled);
@@ -887,7 +886,7 @@ void MedidoresEQAudioProcessorEditor::addKnob (Knob& k, const juce::String& id, 
     k.capIndex = capIndex;
     // El texto del valor (unidades y decimales) lo da el propio parámetro.
     k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, textBoxWidth, 18);
-    k.slider.setTooltip (tip + EQ::utf8 (" Doble clic: valor por defecto. Mayús + arrastrar: ajuste fino. Clic en el valor: escribir un número."));
+    k.slider.setTooltip (tip + " Double-click: default value. Shift + drag: fine adjustment. Click the value to type a number.");
     k.label.setText (text.toUpperCase(), juce::dontSendNotification);
     k.label.setJustificationType (juce::Justification::centred);
     k.label.setInterceptsMouseClicks (false, false);
@@ -899,13 +898,13 @@ void MedidoresEQAudioProcessorEditor::addKnob (Knob& k, const juce::String& id, 
     addAndMakeVisible (k.label);
 }
 
-// Knob de ganancia con rango propio (±18/±12/±6/±3 según el ajuste "Rango").
+// Gain knob with its own range (±18/±12/±6/±3 depending on the "Range" setting).
 void MedidoresEQAudioProcessorEditor::addGainKnob (Knob& k, int b, const juce::String& tip)
 {
     k.capIndex = b;
     k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
-    k.slider.setTooltip (tip + EQ::utf8 (" Doble clic: 0 dB. Mayús + arrastrar: ajuste fino. Clic en el valor: escribir un número."));
-    k.label.setText ("GAN", juce::dontSendNotification);
+    k.slider.setTooltip (tip + " Double-click: 0 dB. Shift + drag: fine adjustment. Click the value to type a number.");
+    k.label.setText ("GAIN", juce::dontSendNotification);
     k.label.setJustificationType (juce::Justification::centred);
     k.label.setInterceptsMouseClicks (false, false);
     gainAttachments[b] = std::make_unique<RangedSliderAttachment> (*proc.apvts.getParameter (EQ::gainId (b)), k.slider);
@@ -930,15 +929,15 @@ void MedidoresEQAudioProcessorEditor::refreshPresets (const juce::String& select
     userNames = presets.userNames();
 
     presetBox.clear (juce::dontSendNotification);
-    presetBox.addSectionHeading (EQ::utf8 ("Fábrica"));
+    presetBox.addSectionHeading ("Factory");
     for (int i = 0; i < factoryNames.size(); ++i) presetBox.addItem (factoryNames[i], 1 + i);
     if (userNames.size() > 0)
     {
         presetBox.addSeparator();
-        presetBox.addSectionHeading ("Usuario");
+        presetBox.addSectionHeading ("User");
         for (int i = 0; i < userNames.size(); ++i) presetBox.addItem (userNames[i], 1001 + i);
     }
-    presetBox.setTextWhenNothingSelected (EQ::utf8 ("Presets…"));
+    presetBox.setTextWhenNothingSelected ("Presets...");
 
     const int idx = userNames.indexOf (select);
     if (idx >= 0) presetBox.setSelectedId (1001 + idx, juce::dontSendNotification);
@@ -956,10 +955,10 @@ void MedidoresEQAudioProcessorEditor::presetChosen()
 
 void MedidoresEQAudioProcessorEditor::askPresetName()
 {
-    auto* w = new juce::AlertWindow ("Guardar preset", "Nombre del preset:", juce::MessageBoxIconType::NoIcon, this);
+    auto* w = new juce::AlertWindow ("Save preset", "Preset name:", juce::MessageBoxIconType::NoIcon, this);
     w->addTextEditor ("name", "", "");
-    w->addButton ("Guardar", 1, juce::KeyPress (juce::KeyPress::returnKey));
-    w->addButton ("Cancelar", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
     juce::Component::SafePointer<MedidoresEQAudioProcessorEditor> safe (this);
     w->enterModalState (true, juce::ModalCallbackFunction::create ([safe, w] (int result)
@@ -978,8 +977,8 @@ void MedidoresEQAudioProcessorEditor::askDeletePreset()
     const auto name = userNames[id - 1001];
 
     juce::Component::SafePointer<MedidoresEQAudioProcessorEditor> safe (this);
-    juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, "Borrar preset",
-                                        EQ::utf8 ("¿Borrar el preset \"") + name + "\"?", "Borrar", "Cancelar", this,
+    juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, "Delete preset",
+                                        "Delete the preset \"" + name + "\"?", "Delete", "Cancel", this,
                                         juce::ModalCallbackFunction::create ([safe, name] (int result)
     {
         if (result != 1 || safe == nullptr) return;
@@ -1202,8 +1201,8 @@ void MedidoresEQAudioProcessorEditor::resized()
     place (inKnob,  { inCol,  area.getY(), colW, rowH });
     place (outKnob, { outCol, area.getY(), colW, rowH });
     const int vuY = area.getY() + rowH + 4;
-    inVU.setBounds  (inCol  + 4, vuY, colW - 8, comboRow.getY() - vuY - 4);
-    outVU.setBounds (outCol + 4, vuY, colW - 8, comboRow.getY() - vuY - 4);
+    inMeter.setBounds  (inCol  + 4, vuY, colW - 8, comboRow.getY() - vuY - 4);
+    outMeter.setBounds (outCol + 4, vuY, colW - 8, comboRow.getY() - vuY - 4);
     bypassToggle.setBounds (inCol + 8, comboRow.getY() + 16, colW - 12, 26);
     autoGainToggle.setBounds (outCol + 8, comboRow.getY() + 16, colW - 12, 26);
 
@@ -1214,13 +1213,13 @@ void MedidoresEQAudioProcessorEditor::resized()
     {
         sections.push_back ({ { colX (col) + 2, panelTop, colW - 4, panelBottom - panelTop }, title });
     };
-    addSection (0, "ENTRADA");
+    addSection (0, "INPUT");
     addSection (1, {});
     for (int col = 2; col <= 7; ++col) addSection (col, {});
-    addSection (8, EQ::utf8 ("CARÁCTER"));
+    addSection (8, "CHARACTER");
     addSection (9, "MASTER");
-    addSection (10, EQ::utf8 ("MEDICIÓN"));
-    addSection (11, "SALIDA");
+    addSection (10, "METERING");
+    addSection (11, "OUTPUT");
     filterSplitY = colTop + filterBlockH + 2;
     sectionTitleY = toggleRow.getY() + 2;
 }

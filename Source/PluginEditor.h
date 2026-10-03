@@ -124,15 +124,15 @@ private:
 
     // Barra superior: presets, ajustes A/B/C/D, deshacer y ajustes del analizador
     juce::ComboBox presetBox;
-    juce::TextButton saveButton { "Guardar" }, deleteButton { "Borrar" };
+    juce::TextButton saveButton { "Save" }, deleteButton { "Delete" };
     juce::StringArray factoryNames, userNames;   // los ids del desplegable se reparten entre ambas listas
     juce::TextButton slotButton[4];
-    juce::TextButton undoButton { "Deshacer" }, redoButton { "Rehacer" };
+    juce::TextButton undoButton { "Undo" }, redoButton { "Redo" };
     juce::ComboBox analyzerBox, speedBox, resBox, smoothBox, holdBox, rangeBox;
     std::unique_ptr<ComboAttachment> analyzerAttachment, speedAttachment, resAttachment, smoothAttachment, holdAttachment, rangeAttachment;
 
     ResponseCurve curve;
-    VUPair inVU, outVU;
+    LedMeterPair inMeter, outMeter;
     MeterPanel meterPanel;
     juce::ToggleButton toggles[EQ::NumBands];
     std::unique_ptr<ButtonAttachment> toggleAttachments[EQ::NumBands];

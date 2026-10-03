@@ -10,52 +10,52 @@ namespace
     const std::vector<Factory>& factory()
     {
         static const std::vector<Factory> presets = {
-            { "Plano", {} },
-            { "Voz: limpieza", {
+            { "Flat", {} },
+            { "Vocal: clean-up", {
                 { "hp_freq", 90.0f }, { "hp_slope", 2.0f },
                 { "b1_freq", 300.0f }, { "b1_gain", -3.0f }, { "b1_q", 1.2f },
                 { "b3_freq", 3500.0f }, { "b3_gain", 2.5f }, { "b3_q", 0.9f },
                 { "hs_freq", 10000.0f }, { "hs_gain", 2.0f } } },
-            { "Bombo", {
+            { "Kick", {
                 { "hp_freq", 30.0f },
                 { "ls_freq", 60.0f }, { "ls_gain", 3.0f },
                 { "b1_freq", 350.0f }, { "b1_gain", -4.0f }, { "b1_q", 1.5f },
                 { "b3_freq", 4000.0f }, { "b3_gain", 3.0f } } },
-            { "Brillo", {
+            { "Brightness", {
                 { "hs_freq", 9000.0f }, { "hs_gain", 4.0f },
                 { "b3_freq", 5000.0f }, { "b3_gain", 1.5f } } },
-            { "Corte de graves", { { "hp_freq", 120.0f }, { "hp_slope", 3.0f } } },
-            { "Tel\u00e9fono", {
+            { "Low cut", { { "hp_freq", 120.0f }, { "hp_slope", 3.0f } } },
+            { "Telephone", {
                 { "hp_freq", 400.0f }, { "hp_slope", 2.0f },
                 { "lp_freq", 3400.0f }, { "lp_slope", 2.0f } } },
-            { "Master: m\u00e1s aire (Side)", {
+            { "Master: more air (Side)", {
                 { "hs_freq", 8000.0f }, { "hs_gain", 3.0f }, { "hs_ch", 2.0f },
                 { "ls_freq", 150.0f }, { "ls_gain", -2.0f }, { "ls_ch", 2.0f } } },
-            { "Voz: de-esser din\u00e1mico", {
+            { "Vocal: dynamic de-esser", {
                 { "hp_freq", 90.0f }, { "hp_slope", 2.0f },
                 { "b3_freq", 6500.0f }, { "b3_gain", -8.0f }, { "b3_q", 3.0f },
                 { "b3_dyn", 1.0f }, { "b3_thr", -32.0f }, { "b3_ratio", 4.0f },
                 { "b3_attack", 2.0f }, { "b3_release", 60.0f } } },
-            { "Bajo: graves controlados", {
+            { "Bass: tight lows", {
                 { "hp_freq", 35.0f }, { "hp_slope", 2.0f },
                 { "ls_freq", 90.0f }, { "ls_gain", -6.0f }, { "ls_type", 1.0f }, { "ls_q", 1.2f },
                 { "ls_dyn", 1.0f }, { "ls_thr", -22.0f }, { "ls_ratio", 3.0f },
                 { "ls_attack", 25.0f }, { "ls_release", 250.0f } } },
-            { "Master: presencia (Mid)", {
+            { "Master: presence (Mid)", {
                 { "b3_freq", 2500.0f }, { "b3_gain", 2.0f }, { "b3_q", 0.8f }, { "b3_ch", 1.0f } } },
-            { "Master: fase lineal suave", {
+            { "Master: gentle linear phase", {
                 { "phase", 2.0f }, { "hp_freq", 25.0f }, { "hp_slope", 2.0f },
                 { "ls_freq", 90.0f }, { "ls_gain", 1.0f }, { "ls_q", 0.6f },
                 { "b3_freq", 3000.0f }, { "b3_gain", -0.8f }, { "b3_q", 0.7f },
                 { "hs_freq", 12000.0f }, { "hs_gain", 1.2f }, { "hs_q", 0.6f },
                 { "mono_freq", 100.0f }, { "character", 0.0f } } },
-            { "Master: calidez Pultec", {
+            { "Master: Pultec warmth", {
                 { "phase", 1.0f },
                 { "ls_type", 2.0f }, { "ls_freq", 60.0f }, { "ls_gain", 3.0f }, { "ls_cut", 2.5f }, { "ls_q", 0.7f },
                 { "hs_type", 4.0f }, { "hs_freq", 8000.0f }, { "hs_gain", 1.5f } } },
-            { "Master: inclinación (tilt)", {
+            { "Master: tilt", {
                 { "phase", 2.0f }, { "ls_type", 3.0f }, { "ls_freq", 1000.0f }, { "ls_gain", 1.5f }, { "ls_q", 0.5f } } },
-            { "Master: graves en mono", {
+            { "Master: mono bass", {
                 { "mono_freq", 120.0f }, { "hp_freq", 25.0f }, { "hp_slope", 2.0f } } },
         };
         return presets;

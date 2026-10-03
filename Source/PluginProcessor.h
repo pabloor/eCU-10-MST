@@ -53,6 +53,9 @@ public:
     // Pico de cada canal desde la última lectura (lineal). Lo lee el editor para los medidores.
     float takeInputPeak (int channel)  { return inPeak[channel & 1].exchange (0.0f); }
     float takeOutputPeak (int channel) { return outPeak[channel & 1].exchange (0.0f); }
+    // RMS de cada canal (lineal, integración de ~300 ms).
+    float getInputRms (int channel) const  { return inRms[channel & 1].load(); }
+    float getOutputRms (int channel) const { return outRms[channel & 1].load(); }
 
     // Ganancia que está aplicando ahora mismo una banda dinámica (dB; 0 si no es dinámica). La lee el editor.
     float getDynamicGainDb (int band) const { return dynGainDb[band].load(); }
@@ -93,6 +96,7 @@ private:
     void runFir (int n);
     void runSolo (int band, int n);
     void pushAnalyzerSamples (const double* l, const double* r, int n);
+    void updateRms (double* ms, std::atomic<float>* out, const double* l, const double* r, int n);
 
     double* ch (int c) { return work[(size_t) c].data(); }
 
@@ -163,6 +167,8 @@ private:
     LoudnessMeter inLoud, procLoud, outLoud;
     TruePeakMeter truePeak;
     std::atomic<float> inPeak[2] { 0.0f, 0.0f }, outPeak[2] { 0.0f, 0.0f };
+    std::atomic<float> inRms[2] { 0.0f, 0.0f }, outRms[2] { 0.0f, 0.0f };
+    double inMs[2] {}, outMs[2] {};   // potencia media suavizada
     std::atomic<float> dynGainDb[EQ::NumBands] {};
     std::atomic<float> correlation { 1.0f }, autoGainDb { 0.0f };
     double corrLR = 0.0, corrLL = 0.0, corrRR = 0.0;

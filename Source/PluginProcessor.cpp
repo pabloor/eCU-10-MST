@@ -91,7 +91,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MedidoresEQAudioProcessor::c
     auto msText = [] (float v, int) { return String (roundToInt (v)) + " ms"; };
     auto thrText = [] (float v, int) { return String (roundToInt (v)) + " dB"; };
     auto cutText = [] (float v, int) { return "-" + String (v, 1) + " dB"; };
-    auto monoText = [] (float v, int) { return v < 1.0f ? String ("Apagado") : String (roundToInt (v)) + " Hz"; };
+    auto monoText = [] (float v, int) { return v < 1.0f ? String ("Off") : String (roundToInt (v)) + " Hz"; };
 
     for (int b = 0; b < EQ::NumBands; ++b)
     {
@@ -99,22 +99,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout MedidoresEQAudioProcessor::c
         const String name (info.name);
 
         layout.add (std::make_unique<AudioParameterBool> (
-            ParameterID { EQ::onId (b), 1 }, name + " activa", true));
+            ParameterID { EQ::onId (b), 1 }, name + " on", true));
 
         layout.add (std::make_unique<AudioParameterFloat> (
-            ParameterID { EQ::freqId (b), 1 }, name + " frecuencia",
+            ParameterID { EQ::freqId (b), 1 }, name + " frequency",
             NormalisableRange<float> (20.0f, 20000.0f, 1.0f, 0.25f), info.freq,
             AudioParameterFloatAttributes().withLabel ("Hz").withStringFromValueFunction (hzText).withValueFromStringFunction (hzParse)));
 
         if (EQ::isCut (b))
         {
             layout.add (std::make_unique<AudioParameterChoice> (
-                ParameterID { EQ::slopeId (b), 1 }, name + " pendiente", EQ::slopeNames(), 1));
+                ParameterID { EQ::slopeId (b), 1 }, name + " slope", EQ::slopeNames(), 1));
             continue;
         }
 
         layout.add (std::make_unique<AudioParameterFloat> (
-            ParameterID { EQ::gainId (b), 1 }, name + " ganancia",
+            ParameterID { EQ::gainId (b), 1 }, name + " gain",
             NormalisableRange<float> (-18.0f, 18.0f, 0.1f), info.gain,
             AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction (dbText).withValueFromStringFunction (numParse)));
 
@@ -124,22 +124,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout MedidoresEQAudioProcessor::c
             AudioParameterFloatAttributes().withStringFromValueFunction (qText).withValueFromStringFunction (numParse)));
 
         layout.add (std::make_unique<AudioParameterChoice> (
-            ParameterID { EQ::typeId (b), 1 }, name + " tipo", EQ::typeNames (b), 0));
+            ParameterID { EQ::typeId (b), 1 }, name + " type", EQ::typeNames (b), 0));
 
         if (EQ::isShelf (b))   // atenuación del modo Pultec
             layout.add (std::make_unique<AudioParameterFloat> (
-                ParameterID { EQ::cutId (b), 1 }, name + EQ::utf8 (" atenuación"),
+                ParameterID { EQ::cutId (b), 1 }, name + " cut",
                 NormalisableRange<float> (0.0f, 18.0f, 0.1f), 6.0f,
                 AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction (cutText).withValueFromStringFunction (numParse)));
 
         // EQ dinámico: la ganancia (hasta el valor del knob de ganancia) solo se aplica cuando el nivel
         // en la banda supera el umbral (compresión) o queda por debajo de él (expansión).
         layout.add (std::make_unique<AudioParameterBool> (
-            ParameterID { EQ::dynId (b), 1 }, name + EQ::utf8 (" dinámica"), false));
+            ParameterID { EQ::dynId (b), 1 }, name + " dynamic", false));
         layout.add (std::make_unique<AudioParameterChoice> (
-            ParameterID { EQ::dmodeId (b), 1 }, name + EQ::utf8 (" modo dinámica"), EQ::dmodeNames(), 0));
+            ParameterID { EQ::dmodeId (b), 1 }, name + " dynamic mode", EQ::dmodeNames(), 0));
         layout.add (std::make_unique<AudioParameterFloat> (
-            ParameterID { EQ::thrId (b), 1 }, name + " umbral",
+            ParameterID { EQ::thrId (b), 1 }, name + " threshold",
             NormalisableRange<float> (-60.0f, 0.0f, 1.0f), -24.0f,
             AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction (thrText).withValueFromStringFunction (numParse)));
         layout.add (std::make_unique<AudioParameterFloat> (
@@ -147,7 +147,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MedidoresEQAudioProcessor::c
             NormalisableRange<float> (1.2f, 10.0f, 0.1f, 0.5f), 3.0f,
             AudioParameterFloatAttributes().withStringFromValueFunction (ratioText).withValueFromStringFunction (numParse)));
         layout.add (std::make_unique<AudioParameterFloat> (
-            ParameterID { EQ::attackId (b), 1 }, name + " ataque",
+            ParameterID { EQ::attackId (b), 1 }, name + " attack",
             NormalisableRange<float> (0.5f, 100.0f, 0.5f, 0.5f), 10.0f,
             AudioParameterFloatAttributes().withLabel ("ms").withStringFromValueFunction (msText).withValueFromStringFunction (numParse)));
         layout.add (std::make_unique<AudioParameterFloat> (
@@ -156,64 +156,64 @@ juce::AudioProcessorValueTreeState::ParameterLayout MedidoresEQAudioProcessor::c
             AudioParameterFloatAttributes().withLabel ("ms").withStringFromValueFunction (msText).withValueFromStringFunction (numParse)));
 
         layout.add (std::make_unique<AudioParameterChoice> (
-            ParameterID { EQ::chId (b), 1 }, name + " canal", EQ::placementNames(), 0));
+            ParameterID { EQ::chId (b), 1 }, name + " channel", EQ::placementNames(), 0));
     }
 
     layout.add (std::make_unique<AudioParameterChoice> (
-        ParameterID { EQ::styleId, 1 }, "Estilo de curva", EQ::styleNames(), 1));
+        ParameterID { EQ::styleId, 1 }, "Curve style", EQ::styleNames(), 1));
     layout.add (std::make_unique<AudioParameterChoice> (
-        ParameterID { EQ::phaseId, 1 }, "Fase", EQ::phaseNames(), 0));
+        ParameterID { EQ::phaseId, 1 }, "Phase", EQ::phaseNames(), 0));
     layout.add (std::make_unique<AudioParameterChoice> (
-        ParameterID { EQ::scId, 1 }, "Detector de la dinámica", EQ::scNames(), 0));
+        ParameterID { EQ::scId, 1 }, "Dynamics detector", EQ::scNames(), 0));
     layout.add (std::make_unique<AudioParameterChoice> (
-        ParameterID { EQ::detId, 1 }, "Tipo de detector", EQ::detNames(), 0));
+        ParameterID { EQ::detId, 1 }, "Detector type", EQ::detNames(), 0));
 
     layout.add (std::make_unique<AudioParameterFloat> (
-        ParameterID { EQ::monoFreqId, 1 }, "Graves en mono",
+        ParameterID { EQ::monoFreqId, 1 }, "Bass mono",
         NormalisableRange<float> (0.0f, 300.0f, 1.0f, 0.6f), 0.0f,
         AudioParameterFloatAttributes().withLabel ("Hz").withStringFromValueFunction (monoText).withValueFromStringFunction (numParse)));
     layout.add (std::make_unique<AudioParameterFloat> (
-        ParameterID { EQ::widthId, 1 }, "Anchura",
+        ParameterID { EQ::widthId, 1 }, "Width",
         NormalisableRange<float> (0.0f, 200.0f, 1.0f), 100.0f,
         AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (pctText).withValueFromStringFunction (numParse)));
     layout.add (std::make_unique<AudioParameterChoice> (
         ParameterID { EQ::ditherId, 1 }, "Dither", EQ::ditherNames(), 0));
 
     layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::bypassId, 1 }, "Bypass", false));
-    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::autoGainId, 1 }, "Igualar volumen", false,
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::autoGainId, 1 }, "Match loudness", false,
                                                      AudioParameterBoolAttributes().withAutomatable (false)));
 
     // Ajustes de la vista (no se automatizan).
     auto view = AudioParameterChoiceAttributes().withAutomatable (false);
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerId, 1 }, "Analizador", EQ::analyzerNames(), 1, view));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerSpeedId, 1 }, "Velocidad analizador", EQ::speedNames(), 1, view));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerResId, 1 }, EQ::utf8 ("Resolución analizador"), EQ::analyzerResNames(), 1, view));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerSmoothId, 1 }, "Suavizado analizador", EQ::analyzerSmoothNames(), 0, view));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerHoldId, 1 }, "Pico del analizador", EQ::holdNames(), 0, view));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::rangeId, 1 }, "Rango de la curva", EQ::rangeNames(), 1, view));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::gainRangeId, 1 }, "Rango de ganancia", EQ::gainRangeNames(), 0, view));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::soloId, 1 }, "Solo de banda", EQ::soloNames(), 0, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerId, 1 }, "Analyzer", EQ::analyzerNames(), 1, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerSpeedId, 1 }, "Analyzer speed", EQ::speedNames(), 1, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerResId, 1 }, "Analyzer resolution", EQ::analyzerResNames(), 1, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerSmoothId, 1 }, "Analyzer smoothing", EQ::analyzerSmoothNames(), 0, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerHoldId, 1 }, "Analyzer peak hold", EQ::holdNames(), 0, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::rangeId, 1 }, "Curve range", EQ::rangeNames(), 1, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::gainRangeId, 1 }, "Gain range", EQ::gainRangeNames(), 0, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::soloId, 1 }, "Band solo", EQ::soloNames(), 0, view));
 
     layout.add (std::make_unique<AudioParameterChoice> (
-        ParameterID { EQ::characterId, 1 }, EQ::utf8 ("Carácter"), EQ::characterNames(), 1));
+        ParameterID { EQ::characterId, 1 }, "Character", EQ::characterNames(), 1));
     layout.add (std::make_unique<AudioParameterChoice> (
-        ParameterID { EQ::osId, 1 }, "Sobremuestreo", EQ::osNames(), 0));
+        ParameterID { EQ::osId, 1 }, "Oversampling", EQ::osNames(), 0));
     layout.add (std::make_unique<AudioParameterFloat> (
         ParameterID { EQ::driveId, 1 }, "Drive",
         NormalisableRange<float> (0.0f, 100.0f, 1.0f), 0.0f,
         AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (pctText).withValueFromStringFunction (numParse)));
 
     layout.add (std::make_unique<AudioParameterFloat> (
-        ParameterID { EQ::mixId, 1 }, EQ::utf8 ("Mezcla saturación"),
+        ParameterID { EQ::mixId, 1 }, "Saturation mix",
         NormalisableRange<float> (0.0f, 100.0f, 1.0f), 100.0f,
         AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (pctText).withValueFromStringFunction (numParse)));
 
     layout.add (std::make_unique<AudioParameterFloat> (
-        ParameterID { EQ::inId, 1 }, "Entrada",
+        ParameterID { EQ::inId, 1 }, "Input",
         NormalisableRange<float> (-12.0f, 12.0f, 0.1f), 0.0f,
         AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction (dbText).withValueFromStringFunction (numParse)));
     layout.add (std::make_unique<AudioParameterFloat> (
-        ParameterID { EQ::outId, 1 }, "Salida",
+        ParameterID { EQ::outId, 1 }, "Output",
         NormalisableRange<float> (-12.0f, 12.0f, 0.1f), 0.0f,
         AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction (dbText).withValueFromStringFunction (numParse)));
 
@@ -300,6 +300,7 @@ void MedidoresEQAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     truePeak.reset();
     corrLR = corrLL = corrRR = 0.0;
     autoGainState = 0.0;
+    inMs[0] = inMs[1] = outMs[0] = outMs[1] = 0.0;
 
     smoothCoef = 1.0 - std::exp (-(double) segment / (0.004 * sampleRate));   // glissando de coeficientes de ~4 ms
     auto prepSmoother = [&] (juce::SmoothedValue<double>& s, double seconds, double value)
@@ -832,6 +833,18 @@ void MedidoresEQAudioProcessor::runSolo (int b, int n)
 }
 
 //==============================================================================
+// RMS suavizado (~300 ms) de los dos canales.
+void MedidoresEQAudioProcessor::updateRms (double* ms, std::atomic<float>* out, const double* l, const double* r, int n)
+{
+    double sumL = 0.0, sumR = 0.0;
+    for (int i = 0; i < n; ++i) { sumL += l[i] * l[i]; sumR += r[i] * r[i]; }
+    const double a = std::exp (-(double) n / (0.3 * currentRate));
+    ms[0] = ms[0] * a + (sumL / (double) n) * (1.0 - a);
+    ms[1] = ms[1] * a + (sumR / (double) n) * (1.0 - a);
+    out[0].store ((float) std::sqrt (ms[0]));
+    out[1].store ((float) std::sqrt (ms[1]));
+}
+
 void MedidoresEQAudioProcessor::processChunk (int n, const Params& p)
 {
     double* l = ch (0);
@@ -851,6 +864,7 @@ void MedidoresEQAudioProcessor::processChunk (int n, const Params& p)
     inPeak[0].store (juce::jmax (inPeak[0].load(), pkL));
     inPeak[1].store (juce::jmax (inPeak[1].load(), pkR));
     inLoud.process (rl, rr, n);
+    updateRms (inMs, inRms, l, r, n);
     if (p.analyzer == 2) pushAnalyzerSamples (l, r, n);
 
     // El original, retardado lo mismo que el procesado, para el bypass.
@@ -934,6 +948,7 @@ void MedidoresEQAudioProcessor::processChunk (int n, const Params& p)
         corrLL = corrLL * cc + l[i] * l[i] * (1.0 - cc);
         corrRR = corrRR * cc + r[i] * r[i] * (1.0 - cc);
     }
+    updateRms (outMs, outRms, l, r, n);
     outPeak[0].store (juce::jmax (outPeak[0].load(), pkL));
     outPeak[1].store (juce::jmax (outPeak[1].load(), pkR));
     const double denom = std::sqrt (corrLL * corrRR);

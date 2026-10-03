@@ -2,13 +2,13 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <cmath>
 
-// Ecualizador de mastering de 8 bandas: paso alto, shelf de graves, cuatro medias, shelf de agudos y paso bajo.
-//  - Pasos alto/bajo con pendiente ajustable (6/12/24/48 dB/oct).
-//  - Cada banda (salvo los pasos) actúa sobre el estéreo, solo el Mid, solo el Side, solo el canal izquierdo o solo el derecho.
-//  - Tipos: las medias son campana o notch; los shelves, shelf, campana, Pultec (realce y atenuación a la vez) o tilt.
-//  - Las bandas que no son de corte pueden ser dinámicas (campana y shelf).
-//  - Estilo de curva (Moderna, Clásica, Americana, Vintage): cómo cambia la Q con la ganancia.
-//  - Todo el cálculo de filtros es en doble precisión.
+// 8-band mastering equalizer: high-pass, low shelf, four mids, high shelf and low-pass.
+//  - High/low-pass filters with selectable slope (6/12/24/48 dB/oct).
+//  - Each band (except the passes) acts on stereo, Mid only, Side only, left only or right only.
+//  - Types: the mids are bell or notch; the shelves are shelf, bell, Pultec (boost and cut at once), tilt or Baxandall.
+//  - Non-cut bands can be dynamic (bell and shelf).
+//  - Curve style (Modern, Classic, American, Vintage): how Q changes with gain.
+//  - All filter math is double precision.
 namespace EQ
 {
     enum Band { HighPass, LowShelf, Bell1, Bell2, Bell3, Bell4, HighShelf, LowPass, NumBands };
@@ -25,14 +25,14 @@ namespace EQ
     struct BandInfo { const char* id; const char* name; float freq; float gain; float q; };
 
     inline const BandInfo bands[NumBands] = {
-        { "hp", "Paso alto",  20.0f,    0.0f, 0.707f },
-        { "ls", "Graves",     100.0f,   0.0f, 0.707f },
-        { "b1", "Medio 1",    250.0f,   0.0f, 1.0f },
-        { "b2", "Medio 2",    800.0f,   0.0f, 1.0f },
-        { "b3", "Medio 3",    2500.0f,  0.0f, 1.0f },
-        { "b4", "Medio 4",    5500.0f,  0.0f, 1.0f },
-        { "hs", "Agudos",     10000.0f, 0.0f, 0.707f },
-        { "lp", "Paso bajo",  20000.0f, 0.0f, 0.707f },
+        { "hp", "High-pass",  20.0f,    0.0f, 0.707f },
+        { "ls", "Low",        100.0f,   0.0f, 0.707f },
+        { "b1", "Mid 1",    250.0f,   0.0f, 1.0f },
+        { "b2", "Mid 2",    800.0f,   0.0f, 1.0f },
+        { "b3", "Mid 3",    2500.0f,  0.0f, 1.0f },
+        { "b4", "Mid 4",    5500.0f,  0.0f, 1.0f },
+        { "hs", "High",       10000.0f, 0.0f, 0.707f },
+        { "lp", "Low-pass",  20000.0f, 0.0f, 0.707f },
     };
 
     inline juce::String freqId  (int b) { return juce::String (bands[b].id) + "_freq"; }
@@ -75,34 +75,34 @@ namespace EQ
     inline const char* rangeId = "view_range";    // rango vertical de la curva: ±6, ±12, ±24 dB
 
     inline juce::StringArray slopeNames()     { return { "6 dB/oct", "12 dB/oct", "24 dB/oct", "48 dB/oct" }; }
-    inline juce::StringArray placementNames() { return { utf8 ("Estéreo"), "Mid", "Side", "Izquierdo", "Derecho" }; }
-    inline juce::StringArray characterNames() { return { "Limpio", "Cinta", utf8 ("Válvula") }; }
-    inline juce::StringArray styleNames()     { return { "Moderna", utf8 ("Clásica"), "Americana", "Vintage" }; }
-    inline juce::StringArray phaseNames()     { return { utf8 ("Mínima"), "Natural", "Lineal" }; }
+    inline juce::StringArray placementNames() { return { "Stereo", "Mid", "Side", "Left", "Right" }; }
+    inline juce::StringArray characterNames() { return { "Clean", "Tape", "Tube" }; }
+    inline juce::StringArray styleNames()     { return { "Modern", "Classic", "American", "Vintage" }; }
+    inline juce::StringArray phaseNames()     { return { "Minimum", "Natural", "Linear" }; }
     inline juce::StringArray osNames()        { return { "2x", "4x" }; }
-    inline juce::StringArray detNames()       { return { "Pico", "RMS" }; }
-    inline juce::StringArray dmodeNames()     { return { utf8 ("Compresión"), utf8 ("Expansión") }; }
+    inline juce::StringArray detNames()       { return { "Peak", "RMS" }; }
+    inline juce::StringArray dmodeNames()     { return { "Compress", "Expand" }; }
     inline juce::StringArray gainRangeNames() { return { utf8 ("\u00b118 dB"), utf8 ("\u00b112 dB"), utf8 ("\u00b16 dB"), utf8 ("\u00b13 dB") }; }
     inline float gainRangeFor (int index)     { return index == 1 ? 12.0f : (index == 2 ? 6.0f : (index == 3 ? 3.0f : 18.0f)); }
-    inline juce::StringArray ditherNames()    { return { "Apagado", "16 bits", "24 bits" }; }
-    inline juce::StringArray scNames()        { return { "Interno", "Externo" }; }
-    inline juce::StringArray analyzerNames()  { return { "Apagado", "Post-EQ", "Pre-EQ" }; }
-    inline juce::StringArray speedNames()     { return { "Lenta", "Media", utf8 ("Rápida") }; }
-    inline juce::StringArray analyzerResNames()    { return { "Normal", "Fina", utf8 ("Máxima") }; }
-    inline juce::StringArray analyzerSmoothNames() { return { "Sin suavizar", "1/6 oct", "1/3 oct" }; }
-    inline juce::StringArray holdNames()      { return { "Sin pico", "Con pico" }; }
+    inline juce::StringArray ditherNames()    { return { "Off", "16 bit", "24 bit" }; }
+    inline juce::StringArray scNames()        { return { "Internal", "External" }; }
+    inline juce::StringArray analyzerNames()  { return { "Off", "Post-EQ", "Pre-EQ" }; }
+    inline juce::StringArray speedNames()     { return { "Slow", "Medium", "Fast" }; }
+    inline juce::StringArray analyzerResNames()    { return { "Normal", "Fine", "Max" }; }
+    inline juce::StringArray analyzerSmoothNames() { return { "No smoothing", "1/6 oct", "1/3 oct" }; }
+    inline juce::StringArray holdNames()      { return { "No peak", "Peak hold" }; }
     inline juce::StringArray rangeNames()     { return { utf8 ("±6 dB"), utf8 ("±12 dB"), utf8 ("±24 dB") }; }
     inline float rangeDbFor (int index)       { return index == 0 ? 6.0f : (index == 2 ? 24.0f : 12.0f); }
     inline int analyzerOrderFor (int index)   { return index == 0 ? 11 : (index == 2 ? 15 : 13); }
 
     inline juce::StringArray typeNames (int b)
     {
-        if (isShelf (b)) return { "Shelf", "Campana", "Pultec", "Tilt", "Baxandall" };
-        return { "Campana", "Notch" };
+        if (isShelf (b)) return { "Shelf", "Bell", "Pultec", "Tilt", "Baxandall" };
+        return { "Bell", "Notch" };
     }
     inline juce::StringArray soloNames()
     {
-        juce::StringArray n { "Ninguna" };
+        juce::StringArray n { "None" };
         for (int b = 0; b < NumBands; ++b) n.add (bands[b].name);
         return n;
     }

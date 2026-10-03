@@ -48,22 +48,21 @@ private:
     juce::ParameterAttachment attachment;
 };
 
-// Dos medidores VU de aguja (L y R, apilados) para la entrada o la salida, con balística, piloto de pico y pico máximo en cifras.
-class VUPair : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+// Two LED meters (L and R side by side) for the input or the output. Each column shows the RMS level as solid LEDs and the peak
+// as dimmer LEDs above it, with peak hold, a clip LED and readouts of the held peak and the RMS.
+class LedMeterPair : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
 {
 public:
-    VUPair (MedidoresEQAudioProcessor& p, bool isInput);
+    LedMeterPair (MedidoresEQAudioProcessor& p, bool isInput);
     void paint (juce::Graphics&) override;
-    void mouseDown (const juce::MouseEvent&) override { held = -100.0f; }   // clic: borra el pico máximo
+    void mouseDown (const juce::MouseEvent&) override { held = -100.0f; for (auto& c : clipFrames) c = 0; }   // click: clear the held peak and clip LEDs
 
 private:
     void timerCallback() override;
-    void drawFace (juce::Graphics&, juce::Rectangle<float> face, const juce::String& tag, float level, bool led);
-
     MedidoresEQAudioProcessor& proc;
     bool input;
-    float level[2] { 0.0f, 0.0f };
-    int ledFrames[2] { 0, 0 };
+    float level[2] { -100.0f, -100.0f }, peak[2] { -100.0f, -100.0f }, rms[2] { -100.0f, -100.0f };
+    int holdFrames[2] { 0, 0 }, clipFrames[2] { 0, 0 };
     float held = -100.0f;
 };
 

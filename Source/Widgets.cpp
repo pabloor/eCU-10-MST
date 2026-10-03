@@ -161,138 +161,140 @@ void RotarySwitch::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-VUPair::VUPair (MedidoresEQAudioProcessor& p, bool isInput) : proc (p), input (isInput)
+LedMeterPair::LedMeterPair (MedidoresEQAudioProcessor& p, bool isInput) : proc (p), input (isInput)
 {
-    setTooltip (juce::String::fromUTF8 ("Medidor VU de aguja (L arriba, R abajo). El piloto rojo avisa de picos de 0 dBFS. Clic: borrar el pico máximo."));
+    setTooltip ("Level meter (L and R, in dBFS): bright LEDs = RMS, dim LEDs above = peak, with peak hold. The red LED at the top lights at 0 dBFS. PEAK = held peak, RMS = loudest channel. Click: clear.");
     startTimerHz (30);
 }
 
-void VUPair::timerCallback()
+void LedMeterPair::timerCallback()
 {
     for (int ch = 0; ch < 2; ++ch)
     {
-        const float peak = input ? proc.takeInputPeak (ch) : proc.takeOutputPeak (ch);
-        level[ch] += (peak - level[ch]) * 0.105f;   // constante de integración ~300 ms, como un VU
-        if (peak >= 0.989f) ledFrames[ch] = 45;
-        else if (ledFrames[ch] > 0) --ledFrames[ch];
-        held = juce::jmax (held, juce::Decibels::gainToDecibels (peak, -100.0f));
+        const float lin = input ? proc.takeInputPeak (ch) : proc.takeOutputPeak (ch);
+        const float db = juce::Decibels::gainToDecibels (lin, -100.0f);
+
+        level[ch] = db > level[ch] ? db : juce::jmax (-100.0f, level[ch] - 1.2f);   // instant attack, ~35 dB/s release
+        if (db >= peak[ch]) { peak[ch] = db; holdFrames[ch] = 45; }
+        else if (holdFrames[ch] > 0) --holdFrames[ch];
+        else peak[ch] = juce::jmax (-100.0f, peak[ch] - 0.8f);
+
+        const float rmsLin = input ? proc.getInputRms (ch) : proc.getOutputRms (ch);
+        rms[ch] = juce::Decibels::gainToDecibels (rmsLin, -100.0f);
+
+        if (lin >= 0.989f) clipFrames[ch] = 90;
+        else if (clipFrames[ch] > 0) --clipFrames[ch];
+        held = juce::jmax (held, db);
     }
     repaint();
 }
 
-void VUPair::drawFace (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& tag, float lvl, bool led)
-{
-    const auto& P = paletteOf (*this);
-
-    // Marco y cara retroiluminada
-    g.setColour (juce::Colours::black.withAlpha (0.5f));
-    g.fillRoundedRectangle (r.expanded (2.5f).translated (0.0f, 1.5f), 6.0f);
-    g.setColour (P.ear.darker (0.4f));
-    g.fillRoundedRectangle (r.expanded (2.5f), 6.0f);
-    g.setGradientFill (juce::ColourGradient (P.vuFace.brighter (0.12f), r.getCentreX(), r.getBottom(),
-                                             P.vuFace.darker (0.45f), r.getCentreX() - r.getWidth() * 0.9f, r.getY(), true));
-    g.fillRoundedRectangle (r, 4.0f);
-
-    g.saveState();
-    g.reduceClipRegion (r.toNearestInt());
-
-    constexpr float vmin = -40.0f, vmax = 3.0f, span = 0.66f;
-    const float rad = juce::jmin (1.04f * r.getHeight(), (r.getWidth() * 0.5f - 8.0f) / std::sin (span));
-    const juce::Point<float> pivot (r.getCentreX(), r.getY() + 0.30f * r.getHeight() + rad);
-    auto pointAt = [&] (float db, float radius)
-    {
-        const float a = -span + 2.0f * span * (juce::jlimit (vmin - 2.0f, vmax + 2.0f, db) - vmin) / (vmax - vmin);
-        return juce::Point<float> (pivot.x + std::sin (a) * radius, pivot.y - std::cos (a) * radius);
-    };
-
-    // Escala: arco, zona roja, marcas y números
-    juce::Path arc, red;
-    for (float db = vmin; db <= vmax + 0.01f; db += 0.5f)
-    {
-        const auto p = pointAt (db, rad);
-        if (db == vmin) arc.startNewSubPath (p); else arc.lineTo (p);
-    }
-    for (float db = -3.0f; db <= vmax + 0.01f; db += 0.5f)
-    {
-        const auto p = pointAt (db, rad + 1.5f);
-        if (db == -3.0f) red.startNewSubPath (p); else red.lineTo (p);
-    }
-    g.setColour (P.vuInk.withAlpha (0.85f));
-    g.strokePath (arc, juce::PathStrokeType (1.1f));
-    g.setColour (P.vuRed);
-    g.strokePath (red, juce::PathStrokeType (3.0f));
-
-    g.setFont (juce::Font (juce::FontOptions (8.5f, juce::Font::bold)));
-    for (float db : { -40.0f, -35.0f, -30.0f, -25.0f, -20.0f, -15.0f, -10.0f, -5.0f, 0.0f, 3.0f })
-    {
-        const bool major = db == -40.0f || db == -30.0f || db == -20.0f || db == -10.0f || db == 0.0f || db == 3.0f || db == -5.0f;
-        const auto a = pointAt (db, rad), b = pointAt (db, rad - (major ? 6.0f : 3.5f));
-        g.setColour (db >= -3.0f ? P.vuRed : P.vuInk.withAlpha (0.85f));
-        g.drawLine (a.x, a.y, b.x, b.y, major ? 1.3f : 0.9f);
-        if (db == -40.0f || db == -20.0f || db == -10.0f || db == 0.0f)   // solo estos llevan número, para que no se pisen
-        {
-            const auto t = pointAt (db, rad - 14.0f);
-            g.drawText (juce::String ((int) db), juce::Rectangle<float> (t.x - 11.0f, t.y - 5.0f, 22.0f, 10.0f), juce::Justification::centred, false);
-        }
-    }
-
-    // Aguja
-    const float db = juce::Decibels::gainToDecibels (lvl, -80.0f);
-    const auto tip = pointAt (db, rad - 2.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.25f));
-    g.drawLine (pivot.x + 1.5f, pivot.y + 1.5f, tip.x + 1.5f, tip.y + 1.5f, 1.6f);
-    g.setColour (P.vuInk.darker (0.4f));
-    g.drawLine (pivot.x, pivot.y, tip.x, tip.y, 1.5f);
-    if (pivot.y < r.getBottom() + 4.0f)   // cubo del eje si queda dentro de la cara
-    {
-        g.setColour (P.vuInk.darker (0.2f));
-        g.fillEllipse (pivot.x - 4.0f, pivot.y - 4.0f, 8.0f, 8.0f);
-    }
-
-    // Cristal: reflejo en la mitad superior
-    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.30f), r.getX(), r.getY(),
-                                             juce::Colours::white.withAlpha (0.0f), r.getX() + r.getWidth() * 0.5f, r.getY() + r.getHeight() * 0.6f, false));
-    g.fillRect (r.withHeight (r.getHeight() * 0.6f));
-    g.setColour (juce::Colours::black.withAlpha (0.35f));   // sombra del borde superior
-    g.fillRect (r.withHeight (2.5f));
-    g.restoreState();
-
-    // Etiqueta de canal y piloto de pico
-    g.setColour (P.vuInk.withAlpha (0.85f));
-    g.setFont (juce::Font (juce::FontOptions (10.0f, juce::Font::bold)));
-    g.drawText (tag, juce::Rectangle<float> (r.getX() + 5.0f, r.getY() + 3.0f, 16.0f, 12.0f), juce::Justification::centredLeft, false);
-
-    const juce::Point<float> lamp (r.getRight() - 9.0f, r.getY() + 9.0f);
-    if (led) { g.setColour (P.vuRed.withAlpha (0.35f)); g.fillEllipse (lamp.x - 6.0f, lamp.y - 6.0f, 12.0f, 12.0f); }
-    g.setGradientFill (juce::ColourGradient (led ? juce::Colour (0xffff7a66) : juce::Colour (0xff4a2a24), lamp.x - 1.0f, lamp.y - 1.5f,
-                                             led ? P.vuRed.darker (0.3f) : juce::Colour (0xff25130f), lamp.x + 2.0f, lamp.y + 2.5f, true));
-    g.fillEllipse (lamp.x - 3.5f, lamp.y - 3.5f, 7.0f, 7.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.6f));
-    g.drawEllipse (lamp.x - 3.5f, lamp.y - 3.5f, 7.0f, 7.0f, 0.8f);
-}
-
-void VUPair::paint (juce::Graphics& g)
+void LedMeterPair::paint (juce::Graphics& g)
 {
     const auto& P = paletteOf (*this);
     auto area = getLocalBounds().toFloat();
 
-    const float gap = 8.0f, readoutH = 22.0f, below = 6.0f;
-    const float faceH = juce::jmin (112.0f, (area.getHeight() - gap - readoutH - below) * 0.5f);
-    auto faces = area.withTrimmedLeft (3.0f).withTrimmedRight (3.0f).withHeight (faceH * 2.0f + gap);
-    drawFace (g, faces.removeFromTop (faceH), "L", level[0], ledFrames[0] > 0);
-    faces.removeFromTop (gap);
-    drawFace (g, faces.removeFromTop (faceH), "R", level[1], ledFrames[1] > 0);
-    const juce::Rectangle<float> readout (area.getX(), area.getY() + faceH * 2.0f + gap + below, area.getWidth(), readoutH);
-
-    // Pico máximo en una ventana empotrada
-    const auto win = readout.reduced (6.0f, 2.0f);
+    // Readout in a recessed window: held peak and RMS (loudest channel), one per line
+    auto win = area.removeFromBottom (36.0f).reduced (6.0f, 1.0f);
     g.setColour (P.inset);
     g.fillRoundedRectangle (win, 3.0f);
     g.setColour (juce::Colours::black.withAlpha (0.7f));
     g.drawRoundedRectangle (win, 3.0f, 1.0f);
-    g.setColour (held > -0.1f ? P.vuRed.brighter (0.4f) : P.insetText);
-    g.setFont (juce::Font (juce::FontOptions (12.0f)));
-    g.drawText (held > -99.0f ? juce::String (held, 1) + " dB" : juce::String ("--"), win, juce::Justification::centred);
+    auto line = [&] (juce::Rectangle<float> r, const juce::String& tag, float value, bool hot)
+    {
+        g.setColour (P.inkMuted);
+        g.setFont (juce::Font (juce::FontOptions (10.0f, juce::Font::bold)));
+        g.drawText (tag, r.reduced (6.0f, 0.0f), juce::Justification::centredLeft, false);
+        g.setColour (hot ? P.vuRed.brighter (0.4f) : P.insetText);
+        g.setFont (juce::Font (juce::FontOptions (12.0f)));
+        g.drawText (value > -99.0f ? juce::String (value, 1) + " dB" : juce::String ("--"), r.reduced (6.0f, 0.0f), juce::Justification::centredRight, false);
+    };
+    line (win.removeFromTop (win.getHeight() * 0.5f), "PEAK", held, held > -0.1f);
+    line (win, "RMS", juce::jmax (rms[0], rms[1]), false);
+    area.removeFromBottom (6.0f);
+
+    // Housing
+    g.setColour (juce::Colours::black.withAlpha (0.5f));
+    g.fillRoundedRectangle (area.translated (0.0f, 1.5f), 6.0f);
+    g.setColour (P.screen);
+    g.fillRoundedRectangle (area, 6.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.8f));
+    g.drawRoundedRectangle (area, 6.0f, 1.2f);
+
+    const float lampSize = 11.0f;
+    auto inner = area.reduced (6.0f, 8.0f);
+    const float clipRowH = lampSize + 5.0f;
+    auto clipRow = inner.removeFromTop (clipRowH);
+    inner.removeFromTop (2.0f);
+
+    constexpr float topDb = 0.0f, bottomDb = -56.0f, stepDb = 2.0f;
+    const int numSegs = (int) ((topDb - bottomDb) / stepDb) + 1;   // 29
+    const float segGap = 1.5f;
+    const float segH = (inner.getHeight() - segGap * (float) (numSegs - 1)) / (float) numSegs;
+    const float colW = juce::jmin (26.0f, (inner.getWidth() - 30.0f) * 0.5f);
+    const float gapW = inner.getWidth() - colW * 2.0f;
+    const juce::Rectangle<float> cols[2] {
+        { inner.getX(), inner.getY(), colW, inner.getHeight() },
+        { inner.getRight() - colW, inner.getY(), colW, inner.getHeight() } };
+
+    auto segColour = [&] (float db)
+    {
+        if (db >= -3.0f)  return P.vuRed;
+        if (db >= -12.0f) return P.accent;
+        return juce::Colour (0xff7fcf6a);
+    };
+
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        // Clip LED
+        const juce::Point<float> lamp (cols[ch].getCentreX(), clipRow.getCentreY());
+        const bool clip = clipFrames[ch] > 0;
+        if (clip) { g.setColour (P.vuRed.withAlpha (0.35f)); g.fillEllipse (lamp.x - 7.0f, lamp.y - 7.0f, 14.0f, 14.0f); }
+        g.setGradientFill (juce::ColourGradient (clip ? juce::Colour (0xffff7a66) : P.lampOff.brighter (0.2f), lamp.x - 1.0f, lamp.y - 1.5f,
+                                                 clip ? P.vuRed.darker (0.3f) : P.lampOff.darker (0.5f), lamp.x + 2.0f, lamp.y + 2.5f, true));
+        g.fillEllipse (lamp.x - lampSize * 0.5f, lamp.y - lampSize * 0.5f, lampSize, lampSize);
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.drawEllipse (lamp.x - lampSize * 0.5f, lamp.y - lampSize * 0.5f, lampSize, lampSize, 0.8f);
+
+        // LED ladder
+        for (int s = 0; s < numSegs; ++s)
+        {
+            const float db = topDb - (float) s * stepDb;
+            const juce::Rectangle<float> r (cols[ch].getX(), inner.getY() + (float) s * (segH + segGap), colW, segH);
+            const auto colour = segColour (db);
+            const bool rmsLit = rms[ch] >= db - stepDb * 0.5f;
+            const bool peakLit = level[ch] >= db - stepDb * 0.5f;
+            const bool isHold = std::abs (peak[ch] - db) < stepDb * 0.5f && peak[ch] > bottomDb;
+            if (rmsLit)
+            {
+                g.setColour (colour.withAlpha (0.25f));
+                g.fillRoundedRectangle (r.expanded (1.5f), 2.0f);
+                g.setColour (colour);
+            }
+            else if (isHold)
+                g.setColour (colour.brighter (0.3f));          // held peak: one bright LED
+            else if (peakLit)
+                g.setColour (colour.withAlpha (0.5f));         // peak: dimmer LEDs above the RMS
+            else
+                g.setColour (colour.withAlpha (0.14f));
+            g.fillRoundedRectangle (r, 1.5f);
+        }
+    }
+
+    // Scale in the middle
+    g.setFont (juce::Font (juce::FontOptions (9.5f)));
+    for (float db : { 0.0f, -6.0f, -12.0f, -18.0f, -24.0f, -36.0f, -48.0f })
+    {
+        const float y = inner.getY() + (topDb - db) / stepDb * (segH + segGap) + segH * 0.5f;
+        g.setColour (db >= -3.0f ? P.vuRed : P.inkMuted);
+        g.drawText (juce::String ((int) db), juce::Rectangle<float> (inner.getX() + colW, y - 6.0f, gapW, 12.0f), juce::Justification::centred, false);
+    }
+
+    // Channel tags
+    g.setColour (P.inkMuted);
+    g.setFont (juce::Font (juce::FontOptions (10.0f, juce::Font::bold)));
+    g.drawText ("L", juce::Rectangle<float> (cols[0].getX(), clipRow.getY() - 1.0f, 10.0f, 10.0f), juce::Justification::centred, false);
+    g.drawText ("R", juce::Rectangle<float> (cols[1].getRight() - 10.0f, clipRow.getY() - 1.0f, 10.0f, 10.0f), juce::Justification::centred, false);
 }
 
 //==============================================================================
@@ -392,8 +394,8 @@ CycleButton::CycleButton (juce::RangedAudioParameter& param, const juce::StringA
 //==============================================================================
 MeterPanel::MeterPanel (MedidoresEQAudioProcessor& p) : proc (p)
 {
-    setTooltip (juce::String::fromUTF8 ("Goniómetro y correlación estéreo (+1 mono, 0 muy ancho, -1 en contrafase: peligro en mono) "
-                                        "y loudness de la salida: M momentáneo, S corto plazo, I integrado, TP true peak. Clic: borrar."));
+    setTooltip ("Goniometer and stereo correlation (+1 mono, 0 very wide, -1 out of phase: danger in mono) and output loudness: "
+                "M momentary, S short-term, I integrated, TP true peak. Click: reset.");
     points.reserve (maxPoints * 2);
     startTimerHz (30);
 }
