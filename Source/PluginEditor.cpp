@@ -1209,7 +1209,7 @@ void MedidoresEQAudioProcessorEditor::resized()
     auto area = getLocalBounds().withTrimmedLeft (earW).withTrimmedRight (earW).reduced (8, 8);
 
     auto bar = area.removeFromTop (30);
-    presetBox.setBounds (bar.removeFromLeft (180));
+    presetBox.setBounds (bar.removeFromLeft (150));
     bar.removeFromLeft (6);
     saveButton.setBounds (bar.removeFromLeft (60));
     bar.removeFromLeft (4);
@@ -1233,15 +1233,15 @@ void MedidoresEQAudioProcessorEditor::resized()
     bar.removeFromRight (6);
     rangeBox.setBounds (bar.removeFromRight (78));
     bar.removeFromRight (6);
-    holdBox.setBounds (bar.removeFromRight (90));
+    holdBox.setBounds (bar.removeFromRight (84));
     bar.removeFromRight (6);
-    smoothBox.setBounds (bar.removeFromRight (106));
+    smoothBox.setBounds (bar.removeFromRight (100));
     bar.removeFromRight (6);
-    resBox.setBounds (bar.removeFromRight (70));
+    resBox.setBounds (bar.removeFromRight (64));
     bar.removeFromRight (6);
-    speedBox.setBounds (bar.removeFromRight (76));
+    speedBox.setBounds (bar.removeFromRight (70));
     bar.removeFromRight (6);
-    analyzerBox.setBounds (bar.removeFromRight (88));
+    analyzerBox.setBounds (bar.removeFromRight (92));
     area.removeFromTop (8);
 
     bezelRect = area.removeFromTop (186);
