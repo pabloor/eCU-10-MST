@@ -6,6 +6,7 @@ Ecualizador de mastering (Audio Unit y VST3) hecho con JUCE. Es la versión para
 
 **1. Fase y precisión**
 - Tres modos de fase: **mínima** (sin latencia), **natural** (fase parcial, menos pre-eco) y **lineal** (sin desfase entre frecuencias). Los filtros FIR se recalculan al mover los controles y la latencia se informa al host.
+- **Calidad** de la fase natural/lineal en tres niveles (Low, Medium, High): menos o más latencia y resolución en graves. Los cambios de fase, calidad o sobremuestreo se hacen con un fundido corto, sin clics.
 - Todo el cálculo de filtros y el procesado es en **doble precisión**.
 - **Suavizado de coeficientes**: automatizar o mover un control no produce clics.
 
@@ -21,6 +22,8 @@ Ecualizador de mastering (Audio Unit y VST3) hecho con JUCE. Es la versión para
 **4. Medición**
 - **LUFS** momentáneo, corto plazo e integrado (ITU-R BS.1770 / EBU R128) y **true peak** (4x).
 - Analizador con tres resoluciones (hasta FFT de 32768), suavizado por 1/6 y 1/3 de octava y línea de **pico máximo**.
+- **Delta**: se oye solo la diferencia entre el procesado y el original (con el volumen igualado y alineado en el tiempo).
+- **Monitorización**: suma a mono, intercambio L/R e inversión de polaridad de cada canal (los medidores miden la señal del programa), y **filtro DC** a la entrada.
 - **Bypass** con el original retardado lo mismo que el procesado, y **Igualar volumen** (compensa el loudness para que la comparación A/B sea justa).
 
 **5. Audio / procesado**
@@ -49,4 +52,4 @@ xattr -cr "/ruta/a/eCU-10 MST.component"
 
 ## Compilación y pruebas
 
-El flujo de trabajo `Construir plugin eCU-10 MST` (manual) compila, comprueba la latencia en 19 casos (`docs/latencia.txt`), ejecuta las pruebas funcionales (`docs/pruebas.txt`), valida con `auval` y `pluginval` y sube el resultado como artefacto. Con la opción *screenshot* guarda capturas de la interfaz en `docs/`.
+El flujo de trabajo `Construir plugin eCU-10 MST` (manual) compila, comprueba la latencia en 24 casos (`docs/latencia.txt`), ejecuta las pruebas funcionales (`docs/pruebas.txt`), valida con `auval` y `pluginval` y sube el resultado como artefacto. Con la opción *screenshot* guarda capturas de la interfaz en `docs/`.

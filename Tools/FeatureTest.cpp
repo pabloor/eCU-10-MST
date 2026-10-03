@@ -305,6 +305,122 @@ int main()
         check ("botones S del editor: clic alcanza, activa, marca y apaga", allOk);
     }
 
+    // 12. Delta: solo se oye la diferencia entre el procesado y el original
+    {
+        Rig rig;
+        setParam (rig.proc, "hp_on", 0.0f); setParam (rig.proc, "lp_on", 0.0f);
+        setParam (rig.proc, "delta", 1.0f);
+        rig.start();
+        const auto flat = gainDb (rig, 1000.0, 1.0);
+        check ("delta con el EQ plano: silencio", flat.first < -80.0, flat.first);
+        setParam (rig.proc, "b2_freq", 1000.0f); setParam (rig.proc, "b2_gain", 6.0f); setParam (rig.proc, "style", 0.0f);
+        const auto bell = gainDb (rig, 1000.0, 1.0);
+        check ("delta de una campana +6 dB: la diferencia (x2 - x) = 0 dB", std::abs (bell.first) < 0.4, bell.first);
+        setParam (rig.proc, "delta", 0.0f);
+        const auto normal = gainDb (rig, 1000.0, 1.0);
+        check ("delta apagado: vuelve el sonido normal (+6 dB)", std::abs (normal.first - 6.0) < 0.4, normal.first);
+    }
+    {
+        // Lo mismo en fase lineal (la diferencia se calcula con el original retardado la misma latencia)
+        Rig rig;
+        setParam (rig.proc, "hp_on", 0.0f); setParam (rig.proc, "lp_on", 0.0f);
+        setParam (rig.proc, "delta", 1.0f); setParam (rig.proc, "phase", 2.0f);
+        rig.start();
+        const auto flat = gainDb (rig, 1000.0, 1.0);
+        check ("delta con el EQ plano en fase lineal: silencio", flat.first < -60.0, flat.first);
+    }
+
+    // 13. Utilidades de monitorizacion
+    {
+        auto sineAt = [] (double amp) { return [=] (int, int n) { return (float) (amp * std::sin (2.0 * juce::MathConstants<double>::pi * 1000.0 * n / Rig::sr)); }; };
+        auto silence = [] (int, int) { return 0.0f; };
+        auto dot = [] (const std::array<std::vector<float>, 2>& o)
+        {
+            double d = 0.0;
+            for (size_t i = o[0].size() - 8192; i < o[0].size(); ++i) d += (double) o[0][i] * o[1][i];
+            return d;
+        };
+
+        {   // mono: una señal solo en L sale igual por los dos canales, 6 dB más baja
+            Rig rig;
+            setParam (rig.proc, "hp_on", 0.0f); setParam (rig.proc, "lp_on", 0.0f); setParam (rig.proc, "mon_mono", 1.0f);
+            rig.start();
+            auto out = rig.run (sineAt (0.2), silence, 80);
+            const double l = dbOf (rmsOf (out[0], out[0].size() - 8192, out[0].size()) / (0.2 / std::sqrt (2.0)));
+            const double r = dbOf (rmsOf (out[1], out[1].size() - 8192, out[1].size()) / (0.2 / std::sqrt (2.0)));
+            check ("monitor mono: L-solo sale por los dos canales a -6 dB", std::abs (l + 6.0) < 0.3 && std::abs (r + 6.0) < 0.3, l);
+        }
+        {   // intercambio L/R
+            Rig rig;
+            setParam (rig.proc, "hp_on", 0.0f); setParam (rig.proc, "lp_on", 0.0f); setParam (rig.proc, "mon_swap", 1.0f);
+            rig.start();
+            auto out = rig.run (sineAt (0.2), silence, 80);
+            const double l = rmsOf (out[0], out[0].size() - 8192, out[0].size()), r = rmsOf (out[1], out[1].size() - 8192, out[1].size());
+            check ("monitor swap: la señal de L aparece en R", l < 1.0e-6 && r > 0.1, r);
+        }
+        {   // polaridad: con L y R iguales, invertir uno los deja en contrafase
+            Rig rig;
+            setParam (rig.proc, "hp_on", 0.0f); setParam (rig.proc, "lp_on", 0.0f); setParam (rig.proc, "mon_pol_l", 1.0f);
+            rig.start();
+            auto out = rig.run (sineAt (0.2), sineAt (0.2), 80);
+            check ("monitor polaridad L: los canales quedan en contrafase", dot (out) < 0.0, dot (out));
+            setParam (rig.proc, "mon_pol_l", 0.0f); setParam (rig.proc, "mon_pol_r", 1.0f);
+            out = rig.run (sineAt (0.2), sineAt (0.2), 80);
+            check ("monitor polaridad R: lo mismo", dot (out) < 0.0, dot (out));
+            setParam (rig.proc, "mon_pol_r", 0.0f);
+            out = rig.run (sineAt (0.2), sineAt (0.2), 80);
+            check ("sin inversion: en fase otra vez", dot (out) > 0.0, dot (out));
+        }
+    }
+
+    // 14. Filtro de continua
+    for (int dc = 0; dc < 2; ++dc)
+    {
+        Rig rig;
+        setParam (rig.proc, "hp_on", 0.0f); setParam (rig.proc, "lp_on", 0.0f); setParam (rig.proc, "dc_filter", (float) dc);
+        rig.start();
+        auto s = [] (int, int n) { return (float) (0.1 + 0.05 * std::sin (2.0 * juce::MathConstants<double>::pi * 1000.0 * n / Rig::sr)); };
+        auto out = rig.run (s, s, 400);
+        double mean = 0.0;
+        for (size_t i = out[0].size() - 8192; i < out[0].size(); ++i) mean += out[0][i];
+        mean /= 8192.0;
+        check (dc ? "filtro DC activado: la continua desaparece" : "filtro DC apagado: la continua pasa", dc ? std::abs (mean) < 0.003 : std::abs (mean - 0.1) < 0.003, mean);
+    }
+
+    // 15. Cambio de fase, calidad y sobremuestreo con el audio en marcha: sin valores raros, con fundido y alineado después
+    {
+        Rig rig;
+        setParam (rig.proc, "hp_on", 0.0f); setParam (rig.proc, "lp_on", 0.0f);
+        rig.start();
+        juce::Random random (42);
+        auto noise = [&random] (int, int) { return 0.2f * (random.nextFloat() * 2.0f - 1.0f); };
+        auto out = rig.run (noise, noise, 20);
+        setParam (rig.proc, "phase", 2.0f);
+        setParam (rig.proc, "phase_quality", 0.0f);
+        setParam (rig.proc, "os", 1.0f);
+        rig.proc.refreshLatency();
+        rig.proc.rebuildKernels();
+        float peak = 0.0f; bool finite = true; float minGain = 1.0f;
+        for (int round = 0; round < 60; ++round)
+        {
+            auto o = rig.run (noise, noise, 2);
+            for (auto v : o[0]) { peak = juce::jmax (peak, std::abs (v)); if (! std::isfinite (v)) finite = false; }
+            juce::Thread::sleep (10);
+            for (size_t w = 0; w + 64 <= o[0].size(); w += 64) minGain = juce::jmin (minGain, (float) rmsOf (o[0], w, w + 64));
+        }
+        check ("cambio de configuracion en marcha: valores validos y sin saltos", finite && peak < 0.45f, peak);
+        check ("  el fundido llega a silenciar el cambio", minGain < 0.02f, minGain);
+
+        // Alineación tras el cambio: un impulso sale justo en la latencia informada
+        const int latency = rig.proc.getLatencySamples();
+        rig.proc.rebuildKernels();   // en el plugin lo hace el temporizador tras el cambio de calidad
+        for (int i = 0; i < 20; ++i) { rig.run ([] (int, int) { return 0.0f; }, [] (int, int) { return 0.0f; }, 1); juce::Thread::sleep (10); }
+        auto o = rig.run ([] (int, int n) { return n == 100 ? 0.1f : 0.0f; }, [] (int, int n) { return n == 100 ? 0.1f : 0.0f; }, (latency + 4096) / Rig::block + 3);
+        size_t pk = 0;
+        for (size_t i = 0; i < o[0].size(); ++i) if (std::abs (o[0][i]) > std::abs (o[0][pk])) pk = i;
+        check ("tras el cambio: el impulso sale en la latencia informada", (int) pk - 100 == latency, (double) ((int) pk - 100));
+    }
+
     std::printf ("%s\n", failures == 0 ? "Todas las pruebas funcionales correctas" : "HAY PRUEBAS FALLIDAS");
     return failures == 0 ? 0 : 1;
 }

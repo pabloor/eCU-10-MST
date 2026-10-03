@@ -60,6 +60,13 @@ namespace EQ
     inline const char* osId = "os";               // sobremuestreo de la saturación: 0 = 2x, 1 = 4x
     inline const char* detId = "dyn_det";         // detector de la dinámica: 0 pico, 1 RMS
     inline const char* gainRangeId = "gain_range";   // rango de los knobs de ganancia (solo vista)
+    inline const char* qualityId = "phase_quality";   // longitud del filtro FIR de la fase natural/lineal: 0 baja, 1 media, 2 alta
+    inline const char* deltaId = "delta";           // escuchar solo la diferencia entre el procesado y el original
+    inline const char* dcId = "dc_filter";          // quita la continua (paso alto de 5 Hz) a la entrada
+    inline const char* monMonoId = "mon_mono";      // monitorización: suma a mono
+    inline const char* monSwapId = "mon_swap";      // monitorización: intercambia L y R
+    inline const char* monPolLId = "mon_pol_l";     // monitorización: invierte la polaridad del canal izquierdo
+    inline const char* monPolRId = "mon_pol_r";     // monitorización: invierte la polaridad del canal derecho
     inline const char* bypassId = "bypass";
     inline const char* autoGainId = "autogain";   // compensa el nivel (en loudness) para comparar con el original
     inline const char* monoFreqId = "mono_freq";  // graves en mono por debajo de esta frecuencia (0 = apagado)
@@ -79,6 +86,7 @@ namespace EQ
     inline juce::StringArray characterNames() { return { "Clean", "Tape", "Tube" }; }
     inline juce::StringArray styleNames()     { return { "Modern", "Classic", "American", "Vintage" }; }
     inline juce::StringArray phaseNames()     { return { "Minimum", "Natural", "Linear" }; }
+    inline juce::StringArray qualityNames()   { return { "Low", "Medium", "High" }; }
     inline juce::StringArray osNames()        { return { "2x", "4x" }; }
     inline juce::StringArray detNames()       { return { "Peak", "RMS" }; }
     inline juce::StringArray dmodeNames()     { return { "Compress", "Expand" }; }
@@ -111,7 +119,8 @@ namespace EQ
     inline bool isViewParam (const juce::String& id)
     {
         return id == analyzerId || id == analyzerSpeedId || id == analyzerResId || id == analyzerSmoothId || id == analyzerHoldId
-               || id == rangeId || id == gainRangeId || id == soloId || id == bypassId || id == autoGainId;
+               || id == rangeId || id == gainRangeId || id == soloId || id == bypassId || id == autoGainId
+               || id == deltaId || id == monMonoId || id == monSwapId || id == monPolLId || id == monPolRId;
     }
 
     inline const juce::Colour bandColours[NumBands] = {

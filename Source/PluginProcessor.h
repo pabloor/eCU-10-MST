@@ -72,6 +72,9 @@ public:
     int getActiveSlot() const { return activeSlot; }
     void switchSlot (int slot);
 
+    // Longitud (muestras) del filtro FIR según la calidad (0 baja, 1 media, 2 alta) y la frecuencia de muestreo.
+    static int firLengthFor (int quality, double sampleRate);
+
     // Latencia total (muestras) con el modo de fase y el sobremuestreo actuales. Se aplica sola al cambiar el modo de fase.
     int computeLatency() const;
     void refreshLatency();
@@ -92,6 +95,7 @@ private:
     void processBand (int band, int n);
     void updateDynamic (int band, int where, int start, int len);
     void applyWidthAndMono (int n, const Params&);
+    void applyConfigSwitch();
     void saturate (int n, const Params&);
     void runFir (int n);
     void runSolo (int band, int n);
@@ -135,7 +139,8 @@ private:
     juce::dsp::Convolution convDirect { juce::dsp::Convolution::Latency { 0 } };
     juce::dsp::Convolution convCross  { juce::dsp::Convolution::Latency { 0 } };
     juce::AudioBuffer<float> firBuf, firBufCross;
-    int firLength = 16384;
+    int firLength = 16384, firQuality = 1, kernelFftSize = 0;
+    std::atomic<bool> rebuildRequested { false };
     std::atomic<bool> kernelsReady { false };
     std::array<float, 160> lastKernelKey {};
     int phaseMode = 0;   // 0 mínima, 1 natural, 2 lineal (el que está activo en el hilo de audio)
@@ -155,7 +160,12 @@ private:
     juce::dsp::Oversampling<float> os4 { 2, 2, juce::dsp::Oversampling<float>::filterHalfBandFIREquiripple, false, true };
     juce::AudioBuffer<float> satBuf;
     int osLatency = 0, osLatency2 = 0, osLatency4 = 0, osActive = 0;   // osActive: 0 = 2x, 1 = 4x
-    DelayLine dryDelay[2], bypassDelay[2];
+    // Cambio de configuración (fase, calidad, sobremuestreo): se silencia con un fundido corto, se cambia y se vuelve a subir.
+    int wantPhase = 0, wantOs = 0, wantQuality = 1;
+    bool ducking = false;
+    juce::SmoothedValue<double> duckSm, deltaSm;
+    double inDcX[2] {}, inDcY[2] {};
+    DelayLine dryDelay[2], bypassDelay[2], firPass[2];   // firPass: retardo equivalente al FIR mientras este no está listo
     float lastAmount = 0.0f;
     bool satWasActive = false;
     double dcX[2] {}, dcY[2] {};

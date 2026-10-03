@@ -601,6 +601,13 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
     presetBox.onChange = [this] { presetChosen(); };
     saveButton.onClick = [this] { askPresetName(); };
     deleteButton.onClick = [this] { askDeletePreset(); };
+    menuButton.setTooltip ("More preset actions: import a preset file, export the current settings to a file, open the presets folder. "
+                           "To organize presets in folders, save them as \"Folder/Name\".");
+    menuButton.onClick = [this] { showPresetMenu(); };
+    addAndMakeVisible (menuButton);
+    helpButton.setTooltip ("Help: while it is on, the bar at the bottom describes whatever control is under the mouse.");
+    helpButton.onClick = [this] { helpOn = ! helpOn; helpButton.setToggleState (helpOn, juce::dontSendNotification); helpText = {}; repaint(); };
+    addAndMakeVisible (helpButton);
     refreshPresets();
 
     // Ajustes A/B/C/D y deshacer
@@ -730,30 +737,31 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
                                                       juce::StringArray { "CLEAN", "TAPE", "TUBE" }, P.accent);
     characterSwitch->setTooltip ("Saturation type: clean, tape or tube.");
     addAndMakeVisible (*characterSwitch);
-    styleSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::styleId), "CURVES",
-                                                  juce::StringArray { "MOD", "CLAS", "AMER", "VINT" }, P.accent);
-    styleSwitch->setTooltip ("Curve style: Modern (constant Q), Classic (wider as gain goes up), American (narrower as gain goes up) or Vintage.");
-    addAndMakeVisible (*styleSwitch);
+    styleButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::styleId), juce::StringArray { "Modern", "Classic", "Amer.", "Vintage" }, "Style: ");
+    styleButton->setTooltip ("Curve style: Modern (constant Q), Classic (wider as gain goes up), American (narrower as gain goes up) or Vintage.");
+    addAndMakeVisible (*styleButton);
     phaseSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::phaseId), "PHASE",
                                                   juce::StringArray { "MIN", "NAT", "LIN" }, P.accent);
     phaseSwitch->setTooltip ("EQ phase: Minimum (no latency, like an analog EQ), Natural (partial phase: less pre-ringing than linear) "
                              "or Linear (no phase shift between frequencies, with latency). Dynamic bands are always minimum phase.");
     addAndMakeVisible (*phaseSwitch);
-    ditherSwitch = std::make_unique<RotarySwitch> (*proc.apvts.getParameter (EQ::ditherId), "DITHER",
-                                                   juce::StringArray { "OFF", "16", "24" }, P.accent);
-    ditherSwitch->setTooltip ("TPDF dither at the output, for when the result will be saved at 16 or 24 bits.");
-    addAndMakeVisible (*ditherSwitch);
-
     osButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::osId), EQ::osNames(), "Oversampling ");
     osButton->setTooltip ("Saturation oversampling: 2x or 4x (cleaner, a little more latency and CPU).");
     addAndMakeVisible (*osButton);
     gainRangeButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::gainRangeId), EQ::gainRangeNames(), "Range ");
     gainRangeButton->setTooltip ("Range of the gain knobs: with +/-6 or +/-3 dB the same travel gives more precision.");
     addAndMakeVisible (*gainRangeButton);
-    scButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::scId), EQ::scNames(), "Detector ");
+    ditherButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::ditherId), EQ::ditherNames(), "Dither: ");
+    ditherButton->setTooltip ("TPDF dither at the output, for when the result will be saved at 16 or 24 bits.");
+    addAndMakeVisible (*ditherButton);
+    qualityButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::qualityId), EQ::qualityNames(), "Quality: ");
+    qualityButton->setTooltip ("Length of the filter used by Natural and Linear phase. Low: about half the latency, less resolution in the lows. "
+                               "High: double the latency, more precise lows. Changing it fades the sound out and in.");
+    addAndMakeVisible (*qualityButton);
+    scButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::scId), juce::StringArray { "Int", "Ext" }, "Sidechain: ");
     scButton->setTooltip ("Signal the dynamics listen to: the plugin's own (internal) or the host sidechain input (external).");
     addAndMakeVisible (*scButton);
-    detButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::detId), EQ::detNames(), "Level ");
+    detButton = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::detId), EQ::detNames(), "Detector: ");
     detButton->setTooltip ("Level detection in the dynamics: peak (fast) or RMS (smoother, closer to how we hear).");
     addAndMakeVisible (*detButton);
 
@@ -761,6 +769,24 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
     bypassToggle.setTooltip ("Compare with the original: the original is delayed by the same latency as the processed signal, so there is no time offset.");
     bypassAttachment = std::make_unique<ButtonAttachment> (proc.apvts, EQ::bypassId, bypassToggle);
     addAndMakeVisible (bypassToggle);
+    dcToggle.setButtonText ("DC filter");
+    dcToggle.setTooltip ("Removes DC offset at the input (5 Hz high-pass, before the EQ). Bypass is not affected.");
+    dcAttachment = std::make_unique<ButtonAttachment> (proc.apvts, EQ::dcId, dcToggle);
+    addAndMakeVisible (dcToggle);
+    deltaToggle.setButtonText ("Delta");
+    deltaToggle.setTooltip ("Delta: you only hear the difference between the processed and the original signal (level matched, time aligned). "
+                            "Useful to hear exactly what the EQ is changing.");
+    deltaAttachment = std::make_unique<ButtonAttachment> (proc.apvts, EQ::deltaId, deltaToggle);
+    addAndMakeVisible (deltaToggle);
+    monoButton = std::make_unique<ParamToggleButton> (*proc.apvts.getParameter (EQ::monMonoId), "MONO");
+    monoButton->setTooltip ("Monitor: sums the output to mono to check compatibility. The meters keep measuring the program signal.");
+    swapButton = std::make_unique<ParamToggleButton> (*proc.apvts.getParameter (EQ::monSwapId), "SWAP");
+    swapButton->setTooltip ("Monitor: swaps the left and right channels.");
+    polLButton = std::make_unique<ParamToggleButton> (*proc.apvts.getParameter (EQ::monPolLId), "POL L");
+    polLButton->setTooltip ("Monitor: inverts the polarity of the left channel.");
+    polRButton = std::make_unique<ParamToggleButton> (*proc.apvts.getParameter (EQ::monPolRId), "POL R");
+    polRButton->setTooltip ("Monitor: inverts the polarity of the right channel.");
+    for (auto* b : { monoButton.get(), swapButton.get(), polLButton.get(), polRButton.get() }) addAndMakeVisible (*b);
     autoGainToggle.setButtonText ("Match");
     autoGainToggle.setTooltip ("Compensates the loudness (over 3 s) of the processed signal so it sounds as loud as the original when comparing.");
     autoGainAttachment = std::make_unique<ButtonAttachment> (proc.apvts, EQ::autoGainId, autoGainToggle);
@@ -774,7 +800,7 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
 
     applyBandColours();
     setDynamicsOpen (dynOpen);
-    startTimerHz (10);
+    startTimerHz (20);
 }
 
 MedidoresEQAudioProcessorEditor::~MedidoresEQAudioProcessorEditor()
@@ -786,6 +812,17 @@ MedidoresEQAudioProcessorEditor::~MedidoresEQAudioProcessorEditor()
 
 void MedidoresEQAudioProcessorEditor::timerCallback()
 {
+    if (helpOn)
+    {
+        juce::String tip = "Hover over a control to see what it does.";
+        if (auto* c = juce::Desktop::getInstance().getMainMouseSource().getComponentUnderMouse())
+            if (isParentOf (c) || c == this)
+                for (auto* comp = c; comp != nullptr && comp != this; comp = comp->getParentComponent())
+                    if (auto* tc = dynamic_cast<juce::TooltipClient*> (comp))
+                        if (tc->getTooltip().isNotEmpty()) { tip = tc->getTooltip(); break; }
+        if (tip != helpText) { helpText = tip; repaint (helpRect); }
+    }
+
     undoButton.setEnabled (proc.undoManager.canUndo());
     redoButton.setEnabled (proc.undoManager.canRedo());
     for (int i = 0; i < 4; ++i)
@@ -794,7 +831,7 @@ void MedidoresEQAudioProcessorEditor::timerCallback()
 
 int MedidoresEQAudioProcessorEditor::windowHeight (bool dynamicsOpen)
 {
-    return dynamicsOpen ? 822 : 674;   // la ventana desplegada añade los ajustes de dinámica (148 px más que la fila compacta)
+    return dynamicsOpen ? 828 : 680;   // la ventana desplegada añade los ajustes de dinámica (148 px más que la fila compacta)
 }
 
 void MedidoresEQAudioProcessorEditor::setDynamicsOpen (bool open)
@@ -863,8 +900,13 @@ void MedidoresEQAudioProcessorEditor::applyBandColours()
     for (auto* k : { &inKnob, &outKnob, &driveKnob, &mixKnob, &monoKnob, &widthKnob }) styleKnob (*k);
     bypassToggle.setColour (juce::ToggleButton::tickColourId, P.vuRed.brighter (0.3f));
     autoGainToggle.setColour (juce::ToggleButton::tickColourId, P.accent);
+    dcToggle.setColour (juce::ToggleButton::tickColourId, P.accent);
+    deltaToggle.setColour (juce::ToggleButton::tickColourId, P.vuRed.brighter (0.3f));
+    for (auto* b : { monoButton.get(), swapButton.get(), polLButton.get(), polRButton.get() })
+        if (b != nullptr) b->setColour (juce::TextButton::buttonOnColourId, P.accent);
+    helpButton.setColour (juce::TextButton::buttonOnColourId, P.accent);
     for (auto& sb : slotButton) sb.setColour (juce::TextButton::buttonOnColourId, P.accent);
-    for (auto* s : { characterSwitch.get(), styleSwitch.get(), phaseSwitch.get(), ditherSwitch.get() })
+    for (auto* s : { characterSwitch.get(), phaseSwitch.get() })
         if (s != nullptr) s->setCapColour (P.accent);
 }
 
@@ -933,9 +975,29 @@ void MedidoresEQAudioProcessorEditor::refreshPresets (const juce::String& select
     for (int i = 0; i < factoryNames.size(); ++i) presetBox.addItem (factoryNames[i], 1 + i);
     if (userNames.size() > 0)
     {
+        // User presets: the ones in the root first, then one section per folder ("Folder/Name")
+        struct Item { juce::String heading, label; int index; };
+        std::vector<Item> items;
+        for (int i = 0; i < userNames.size(); ++i)
+        {
+            const auto& n = userNames[i];
+            const bool inFolder = n.contains ("/");
+            items.push_back ({ inFolder ? n.upToFirstOccurrenceOf ("/", false, false) : juce::String ("User"),
+                               inFolder ? n.fromLastOccurrenceOf ("/", false, false) : n, i });
+        }
+        std::stable_sort (items.begin(), items.end(), [] (const Item& a, const Item& b)
+        {
+            if ((a.heading == "User") != (b.heading == "User")) return a.heading == "User";
+            return a.heading.compareIgnoreCase (b.heading) < 0;
+        });
+
         presetBox.addSeparator();
-        presetBox.addSectionHeading ("User");
-        for (int i = 0; i < userNames.size(); ++i) presetBox.addItem (userNames[i], 1001 + i);
+        juce::String current;
+        for (const auto& it : items)
+        {
+            if (it.heading != current) { presetBox.addSectionHeading (it.heading); current = it.heading; }
+            presetBox.addItem (it.label, 1001 + it.index);
+        }
     }
     presetBox.setTextWhenNothingSelected ("Presets...");
 
@@ -953,10 +1015,60 @@ void MedidoresEQAudioProcessorEditor::presetChosen()
     deleteButton.setEnabled (id >= 1001);
 }
 
+void MedidoresEQAudioProcessorEditor::showPresetMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (1, "Import preset file...");
+    menu.addItem (2, "Export current settings...");
+    menu.addSeparator();
+    menu.addItem (3, "Open presets folder");
+
+    juce::Component::SafePointer<MedidoresEQAudioProcessorEditor> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton), [safe] (int result)
+    {
+        if (safe == nullptr || result == 0) return;
+
+        if (result == 3)
+        {
+            PresetManager::folder().createDirectory();
+            PresetManager::folder().revealToUser();
+        }
+        else if (result == 1)
+        {
+            safe->chooser = std::make_unique<juce::FileChooser> ("Import preset", juce::File(), "*.xml");
+            safe->chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                        [safe] (const juce::FileChooser& fc)
+            {
+                if (safe == nullptr) return;
+                const auto file = fc.getResult();
+                if (! file.existsAsFile()) return;
+                const auto name = safe->presets.importFrom (file);
+                if (name.isNotEmpty()) safe->refreshPresets (name);
+                else juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Import preset", "That file is not an eCU-10 MST preset.");
+            });
+        }
+        else if (result == 2)
+        {
+            safe->chooser = std::make_unique<juce::FileChooser> ("Export settings",
+                juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("eCU-10 MST preset.xml"), "*.xml");
+            safe->chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                            | juce::FileBrowserComponent::warnAboutOverwriting,
+                                        [safe] (const juce::FileChooser& fc)
+            {
+                if (safe == nullptr) return;
+                const auto file = fc.getResult();
+                if (file != juce::File() && ! safe->presets.exportTo (file))
+                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Export settings", "The file could not be written.");
+            });
+        }
+    });
+}
+
 void MedidoresEQAudioProcessorEditor::askPresetName()
 {
     auto* w = new juce::AlertWindow ("Save preset", "Preset name:", juce::MessageBoxIconType::NoIcon, this);
     w->addTextEditor ("name", "", "");
+    w->addTextBlock ("Tip: use \"Folder/Name\" to save the preset inside a folder.");
     w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
     w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
@@ -1055,6 +1167,14 @@ void MedidoresEQAudioProcessorEditor::paint (juce::Graphics& g)
         g.drawLine (r.getX() + 10.0f, (float) filterSplitY, r.getRight() - 10.0f, (float) filterSplitY, 1.2f);
     }
 
+    if (helpOn)
+    {
+        g.setColour (P.accent);
+        g.setFont (juce::Font (juce::FontOptions (11.0f)));
+        g.drawFittedText (helpText.isEmpty() ? juce::String ("Hover over a control to see what it does.") : helpText, helpRect,
+                          juce::Justification::centredLeft, 2, 0.95f);
+    }
+
     // Placa con el nombre del equipo
     {
         const juce::Rectangle<float> r ((float) stripRect.getX() + 2.0f, (float) stripRect.getY() + 2.0f, 262.0f, 26.0f);
@@ -1079,33 +1199,37 @@ void MedidoresEQAudioProcessorEditor::resized()
     auto area = getLocalBounds().withTrimmedLeft (earW).withTrimmedRight (earW).reduced (8, 8);
 
     auto bar = area.removeFromTop (30);
-    presetBox.setBounds (bar.removeFromLeft (190));
+    presetBox.setBounds (bar.removeFromLeft (180));
     bar.removeFromLeft (6);
-    saveButton.setBounds (bar.removeFromLeft (64));
+    saveButton.setBounds (bar.removeFromLeft (60));
     bar.removeFromLeft (4);
-    deleteButton.setBounds (bar.removeFromLeft (64));
-    bar.removeFromLeft (16);
+    deleteButton.setBounds (bar.removeFromLeft (60));
+    bar.removeFromLeft (4);
+    menuButton.setBounds (bar.removeFromLeft (32));
+    bar.removeFromLeft (14);
     for (int i = 0; i < 4; ++i)
     {
         slotButton[i].setBounds (bar.removeFromLeft (30));
         bar.removeFromLeft (3);
     }
-    bar.removeFromLeft (10);
-    undoButton.setBounds (bar.removeFromLeft (76));
+    bar.removeFromLeft (8);
+    undoButton.setBounds (bar.removeFromLeft (58));
     bar.removeFromLeft (4);
-    redoButton.setBounds (bar.removeFromLeft (72));
+    redoButton.setBounds (bar.removeFromLeft (58));
+    bar.removeFromLeft (10);
+    helpButton.setBounds (bar.removeFromLeft (54));
 
-    rangeBox.setBounds (bar.removeFromRight (84));
+    rangeBox.setBounds (bar.removeFromRight (78));
     bar.removeFromRight (6);
-    holdBox.setBounds (bar.removeFromRight (92));
+    holdBox.setBounds (bar.removeFromRight (90));
     bar.removeFromRight (6);
-    smoothBox.setBounds (bar.removeFromRight (110));
+    smoothBox.setBounds (bar.removeFromRight (106));
     bar.removeFromRight (6);
-    resBox.setBounds (bar.removeFromRight (84));
+    resBox.setBounds (bar.removeFromRight (70));
     bar.removeFromRight (6);
-    speedBox.setBounds (bar.removeFromRight (80));
+    speedBox.setBounds (bar.removeFromRight (76));
     bar.removeFromRight (6);
-    analyzerBox.setBounds (bar.removeFromRight (92));
+    analyzerBox.setBounds (bar.removeFromRight (88));
     area.removeFromTop (8);
 
     bezelRect = area.removeFromTop (186);
@@ -1115,6 +1239,7 @@ void MedidoresEQAudioProcessorEditor::resized()
     stripRect = area.removeFromBottom (30);
     area.removeFromBottom (6);
     dynExpandButton.setBounds (stripRect.getCentreX() - 105, stripRect.getY() + 2, 210, 26);
+    helpRect = juce::Rectangle<int> (stripRect.getCentreX() + 120, stripRect.getY() + 1, stripRect.getRight() - stripRect.getCentreX() - 124, stripRect.getHeight() - 2);
 
     // Columnas (de izquierda a derecha): ENTRADA | FILTROS (paso alto arriba, paso bajo abajo) | Graves | Medio 1-4 | Agudos |
     //                                    CARÁCTER | MASTER | MEDICIÓN | SALIDA
@@ -1125,7 +1250,7 @@ void MedidoresEQAudioProcessorEditor::resized()
     const int bandCol[EQ::NumBands] = { 1, 2, 3, 4, 5, 6, 7, 1 };   // paso alto y paso bajo comparten columna
 
     auto toggleRow = area.removeFromTop (26);
-    auto comboRow = area.removeFromBottom (58);
+    auto comboRow = area.removeFromBottom (76);
     auto dynRow = area.removeFromBottom (dynOpen ? 200 : 52);   // palanca de dinámica + medidor (+ modo y 4 knobs al desplegar)
     const int rowH = area.getHeight() / 3;
     auto place = [] (Knob& k, juce::Rectangle<int> r)
@@ -1173,8 +1298,8 @@ void MedidoresEQAudioProcessorEditor::resized()
         place (releaseKnob[b], { x + colW / 2, dynRow.getY() + 50 + knobRowH, colW / 2, knobRowH });
         dmodeButton[b]->setBounds (x + 8, dynRow.getY() + 50 + 2 * knobRowH + 4, colW - 16, 22);
 
-        typeButton[b]->setBounds (x + 8, comboRow.getY() + 4, colW - 16, 24);
-        placementButtons[b]->setBounds (x + 4, comboRow.getY() + 32, colW - 8, 24);
+        typeButton[b]->setBounds (x + 8, comboRow.getY() + 8, colW - 16, 24);
+        placementButtons[b]->setBounds (x + 4, comboRow.getY() + 38, colW - 8, 24);
     }
 
     // Columnas de los extremos, de carácter y de master
@@ -1184,27 +1309,42 @@ void MedidoresEQAudioProcessorEditor::resized()
 
     place (driveKnob, { characterCol, area.getY(), colW, rowH });
     place (mixKnob,   { characterCol, area.getY() + rowH, colW, rowH });
-    characterSwitch->setBounds (characterCol + 2, y3, colW - 4, rest / 2);
-    styleSwitch->setBounds (characterCol + 2, y3 + rest / 2, colW - 4, rest / 2);
-    osButton->setBounds (characterCol + 6, comboRow.getY() + 4, colW - 12, 24);
-    gainRangeButton->setBounds (characterCol + 6, comboRow.getY() + 32, colW - 12, 24);
+    characterSwitch->setBounds (characterCol + 2, y3, colW - 4, rest - 30);
+    styleButton->setBounds (characterCol + 6, y3 + rest - 28, colW - 12, 24);
+    auto threeButtons = [&] (int colXpos, CycleButton& a, CycleButton& b, CycleButton& c)
+    {
+        a.setBounds (colXpos + 6, comboRow.getY() + 3, colW - 12, 22);
+        b.setBounds (colXpos + 6, comboRow.getY() + 27, colW - 12, 22);
+        c.setBounds (colXpos + 6, comboRow.getY() + 51, colW - 12, 22);
+    };
+    osButton->setBounds (characterCol + 6, comboRow.getY() + 3, colW - 12, 22);
+    threeButtons (characterCol, *osButton, *gainRangeButton, *ditherButton);
 
     place (monoKnob,  { masterCol, area.getY(), colW, rowH });
     place (widthKnob, { masterCol, area.getY() + rowH, colW, rowH });
-    phaseSwitch->setBounds (masterCol + 2, y3, colW - 4, rest / 2);
-    ditherSwitch->setBounds (masterCol + 2, y3 + rest / 2, colW - 4, rest / 2);
-    scButton->setBounds (masterCol + 6, comboRow.getY() + 4, colW - 12, 24);
-    detButton->setBounds (masterCol + 6, comboRow.getY() + 32, colW - 12, 24);
+    phaseSwitch->setBounds (masterCol + 2, y3, colW - 4, rest);
+    threeButtons (masterCol, *qualityButton, *scButton, *detButton);
 
-    meterPanel.setBounds (meterCol + 2, area.getY() + 2, colW - 4, bottomY - area.getY() - 2);
+    // Measurement column: goniometer, correlation and loudness above; monitoring tools below
+    const int monitorH = 56;
+    meterPanel.setBounds (meterCol + 2, area.getY() + 2, colW - 4, bottomY - area.getY() - 2 - monitorH - 4);
+    {
+        const int bw = (colW - 14) / 2, bx = meterCol + 6, by = bottomY - monitorH;
+        monoButton->setBounds (bx, by, bw, 24);
+        swapButton->setBounds (bx + bw + 2, by, bw, 24);
+        polLButton->setBounds (bx, by + 28, bw, 24);
+        polRButton->setBounds (bx + bw + 2, by + 28, bw, 24);
+    }
 
     place (inKnob,  { inCol,  area.getY(), colW, rowH });
     place (outKnob, { outCol, area.getY(), colW, rowH });
     const int vuY = area.getY() + rowH + 4;
     inMeter.setBounds  (inCol  + 4, vuY, colW - 8, comboRow.getY() - vuY - 4);
     outMeter.setBounds (outCol + 4, vuY, colW - 8, comboRow.getY() - vuY - 4);
-    bypassToggle.setBounds (inCol + 8, comboRow.getY() + 16, colW - 12, 26);
-    autoGainToggle.setBounds (outCol + 8, comboRow.getY() + 16, colW - 12, 26);
+    bypassToggle.setBounds (inCol + 8, comboRow.getY() + 6, colW - 12, 26);
+    dcToggle.setBounds (inCol + 8, comboRow.getY() + 40, colW - 12, 26);
+    autoGainToggle.setBounds (outCol + 8, comboRow.getY() + 6, colW - 12, 26);
+    deltaToggle.setBounds (outCol + 8, comboRow.getY() + 40, colW - 12, 26);
 
     // Recuadros serigrafiados: de la fila de interruptores al último control
     sections.clear();

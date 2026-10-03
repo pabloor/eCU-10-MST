@@ -110,6 +110,22 @@ private:
     juce::ParameterAttachment attachment;
 };
 
+// Pulsador de selección ligado a un parámetro booleano: se enciende con su color cuando está activo (monitorización, solo...).
+class ParamToggleButton : public juce::TextButton
+{
+public:
+    ParamToggleButton (juce::RangedAudioParameter& param, const juce::String& text)
+        : attachment (param, [this] (float v) { setToggleState (v > 0.5f, juce::dontSendNotification); })
+    {
+        setButtonText (text);
+        onClick = [this] { attachment.setValueAsCompleteGesture (getToggleState() ? 0.0f : 1.0f); };
+        attachment.sendInitialUpdate();
+    }
+
+private:
+    juce::ParameterAttachment attachment;
+};
+
 // Medición de la salida: goniómetro (vectorscopio), correlación estéreo y loudness (M / S / I) con true peak.
 // Clic: borra el integrado y el pico.
 class MeterPanel : public juce::Component, public juce::SettableTooltipClient, private juce::Timer

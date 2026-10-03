@@ -147,10 +147,22 @@ private:
     int soloIndex = 0;
 
     Knob inKnob, outKnob, driveKnob, mixKnob, monoKnob, widthKnob;
-    std::unique_ptr<RotarySwitch> characterSwitch, styleSwitch, phaseSwitch, ditherSwitch;
-    std::unique_ptr<CycleButton> osButton, gainRangeButton, scButton, detButton;
-    juce::ToggleButton bypassToggle, autoGainToggle;
-    std::unique_ptr<ButtonAttachment> bypassAttachment, autoGainAttachment;
+    std::unique_ptr<RotarySwitch> characterSwitch, phaseSwitch;
+    std::unique_ptr<CycleButton> styleButton, osButton, gainRangeButton, ditherButton, qualityButton, scButton, detButton;
+    juce::ToggleButton bypassToggle, dcToggle, autoGainToggle, deltaToggle;
+    std::unique_ptr<ButtonAttachment> bypassAttachment, dcAttachment, autoGainAttachment, deltaAttachment;
+    std::unique_ptr<ParamToggleButton> monoButton, swapButton, polLButton, polRButton;   // monitoring tools
+
+    // Help bar: with Help on, the strip at the bottom shows the description of the control under the mouse
+    juce::TextButton helpButton { "Help" };
+    bool helpOn = false;
+    juce::String helpText;
+    juce::Rectangle<int> helpRect;
+
+    // Presets: extra menu (import, export, open folder)
+    juce::TextButton menuButton { "..." };
+    std::unique_ptr<juce::FileChooser> chooser;
+    void showPresetMenu();
     juce::TextButton dynExpandButton;
     bool dynOpen = false;
 

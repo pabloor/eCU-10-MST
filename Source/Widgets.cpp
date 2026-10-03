@@ -90,7 +90,7 @@ RotarySwitch::Geometry RotarySwitch::geometry() const
     g.r = juce::jmin (w * 0.2f, (h - 16.0f) * 0.2f);
     g.lx = juce::jmin (w * 0.40f, g.r * 2.4f);
     g.ly = juce::jmin ((h - 16.0f) * 0.42f, g.r * 2.1f);
-    g.c = { w * 0.5f, juce::jmin (h * 0.58f, 16.0f + g.ly + 14.0f) };
+    g.c = { w * 0.5f, 22.0f + g.ly };
     return g;
 }
 

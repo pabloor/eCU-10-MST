@@ -14,6 +14,7 @@ namespace
         key[0] = read (EQ::phaseId);
         key[1] = (float) sampleRate;
         key[2] = read (EQ::styleId);
+        key[150] = read (EQ::qualityId);
         int i = 3;
         for (int b = 0; b < EQ::NumBands; ++b)
         {
@@ -42,6 +43,8 @@ struct MedidoresEQAudioProcessor::Params
     int character = 0, phase = 0, dither = 0, solo = 0, analyzer = 1, osChoice = 0;
     float drive = 0.0f, mix = 100.0f, monoFreq = 0.0f, width = 100.0f, inDb = 0.0f, outDb = 0.0f;
     bool bypass = false, autoGain = false, extSc = false, rms = false;
+    int quality = 1;
+    bool delta = false, dcFilter = false, monMono = false, monSwap = false, polL = false, polR = false;
 };
 
 //==============================================================================
@@ -164,6 +167,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout MedidoresEQAudioProcessor::c
     layout.add (std::make_unique<AudioParameterChoice> (
         ParameterID { EQ::phaseId, 1 }, "Phase", EQ::phaseNames(), 0));
     layout.add (std::make_unique<AudioParameterChoice> (
+        ParameterID { EQ::qualityId, 1 }, "Phase quality", EQ::qualityNames(), 1));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::dcId, 1 }, "DC filter", false));
+    layout.add (std::make_unique<AudioParameterChoice> (
         ParameterID { EQ::scId, 1 }, "Dynamics detector", EQ::scNames(), 0));
     layout.add (std::make_unique<AudioParameterChoice> (
         ParameterID { EQ::detId, 1 }, "Detector type", EQ::detNames(), 0));
@@ -180,8 +186,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout MedidoresEQAudioProcessor::c
         ParameterID { EQ::ditherId, 1 }, "Dither", EQ::ditherNames(), 0));
 
     layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::bypassId, 1 }, "Bypass", false));
-    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::autoGainId, 1 }, "Match loudness", false,
-                                                     AudioParameterBoolAttributes().withAutomatable (false)));
+    auto viewBool = AudioParameterBoolAttributes().withAutomatable (false);
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::autoGainId, 1 }, "Match loudness", false, viewBool));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::deltaId, 1 }, "Delta", false, viewBool));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::monMonoId, 1 }, "Monitor mono", false, viewBool));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::monSwapId, 1 }, "Monitor swap L/R", false, viewBool));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::monPolLId, 1 }, "Monitor polarity L", false, viewBool));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { EQ::monPolRId, 1 }, "Monitor polarity R", false, viewBool));
 
     // Ajustes de la vista (no se automatizan).
     auto view = AudioParameterChoiceAttributes().withAutomatable (false);
@@ -235,11 +246,19 @@ bool MedidoresEQAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
 }
 
 //==============================================================================
+int MedidoresEQAudioProcessor::firLengthFor (int quality, double sampleRate)
+{
+    // Más larga a frecuencias de muestreo altas para mantener la resolución en graves; la calidad la divide o multiplica por dos.
+    const int base = sampleRate <= 50000.0 ? 16384 : (sampleRate <= 100000.0 ? 32768 : 65536);
+    return quality <= 0 ? base / 2 : (quality >= 2 ? base * 2 : base);
+}
+
 int MedidoresEQAudioProcessor::computeLatency() const
 {
     const int os = (int) apvts.getRawParameterValue (EQ::osId)->load() == 1 ? osLatency4 : osLatency2;
     const int phase = (int) apvts.getRawParameterValue (EQ::phaseId)->load();
-    return os + (phase > 0 ? firLength / 2 : 0);
+    const int quality = (int) apvts.getRawParameterValue (EQ::qualityId)->load();
+    return os + (phase > 0 ? firLengthFor (quality, currentRate) / 2 : 0);
 }
 
 void MedidoresEQAudioProcessor::refreshLatency()
@@ -257,6 +276,7 @@ void MedidoresEQAudioProcessor::handleAsyncUpdate()
 
 void MedidoresEQAudioProcessor::timerCallback()
 {
+    if (rebuildRequested.exchange (false)) { rebuildKernels(); return; }
     if ((int) apvts.getRawParameterValue (EQ::phaseId)->load() == 0) return;
     if (kernelKey (apvts, currentRate) != lastKernelKey) rebuildKernels();
 }
@@ -274,8 +294,14 @@ void MedidoresEQAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     osLatency = osActive == 1 ? osLatency4 : osLatency2;
 
     // Longitud del filtro FIR del modo de fase lineal: más larga a frecuencias de muestreo altas para mantener la resolución en graves.
-    firLength = sampleRate <= 50000.0 ? 16384 : (sampleRate <= 100000.0 ? 32768 : 65536);
-    kernelFft = std::make_unique<juce::dsp::FFT> (juce::roundToInt (std::log2 ((double) firLength)));
+    firQuality = (int) apvts.getRawParameterValue (EQ::qualityId)->load();
+    firLength = firLengthFor (firQuality, sampleRate);
+    kernelFft.reset();
+    kernelFftSize = 0;
+    wantPhase = phaseMode = (int) apvts.getRawParameterValue (EQ::phaseId)->load();
+    wantOs = osActive;
+    wantQuality = firQuality;
+    ducking = false;
 
     for (auto* v : { &work, &raw, &scBuf, &scratch, &dryBuf })
         for (auto& c : *v) c.assign ((size_t) maxBlockSize, 0.0);
@@ -286,7 +312,8 @@ void MedidoresEQAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     for (int c = 0; c < 2; ++c)
     {
         dryDelay[c].prepare (juce::jmax (osLatency2, osLatency4) + 2);
-        bypassDelay[c].prepare (firLength / 2 + juce::jmax (osLatency2, osLatency4) + 2);
+        bypassDelay[c].prepare (firLengthFor (2, sampleRate) / 2 + juce::jmax (osLatency2, osLatency4) + 2);
+        firPass[c].prepare (firLengthFor (2, sampleRate) / 2 + 2);
     }
     satWasActive = false;
     lastAmount = 0.0f;
@@ -312,6 +339,9 @@ void MedidoresEQAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     prepSmoother (outGainSm, 0.02, juce::Decibels::decibelsToGain ((double) apvts.getRawParameterValue (EQ::outId)->load()));
     prepSmoother (bypassSm,  0.01, apvts.getRawParameterValue (EQ::bypassId)->load() > 0.5f ? 1.0 : 0.0);
     prepSmoother (autoSm,    0.5,  1.0);
+    prepSmoother (duckSm,    0.01, 1.0);
+    prepSmoother (deltaSm,   0.01, 0.0);
+    inDcX[0] = inDcX[1] = inDcY[0] = inDcY[1] = 0.0;
 
     for (auto& b : band)
     {
@@ -327,7 +357,6 @@ void MedidoresEQAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     convCross.prepare (spec);
     kernelsReady = false;
     lastKernelKey.fill (-1.0f);
-    phaseMode = (int) apvts.getRawParameterValue (EQ::phaseId)->load();
     if (phaseMode != 0) rebuildKernels();
 
     refreshLatency();
@@ -515,10 +544,19 @@ void MedidoresEQAudioProcessor::processBand (int b, int n)
 // aplicada con dos convoluciones. Los filtros FIR están centrados en N/2: de ahí su latencia.
 void MedidoresEQAudioProcessor::runFir (int n)
 {
-    if (! kernelsReady.load()) return;
-
     double* l = ch (0);
     double* r = ch (1);
+    if (! kernelsReady.load())
+    {
+        // El filtro aún no está calculado: la señal pasa sin cambios pero con el mismo retardo, para no desalinear nada.
+        for (int i = 0; i < n; ++i)
+        {
+            l[i] = firPass[0].process (l[i], firLength / 2);
+            r[i] = firPass[1].process (r[i], firLength / 2);
+        }
+        return;
+    }
+
     float* d0 = firBuf.getWritePointer (0);
     float* d1 = firBuf.getWritePointer (1);
     float* c0 = firBufCross.getWritePointer (0);
@@ -552,10 +590,15 @@ void MedidoresEQAudioProcessor::runFir (int n)
 void MedidoresEQAudioProcessor::rebuildKernels()
 {
     const int mode = (int) apvts.getRawParameterValue (EQ::phaseId)->load();
-    if (mode == 0 || kernelFft == nullptr) return;
+    if (mode == 0) return;
 
     lastKernelKey = kernelKey (apvts, currentRate);
-    const int N = firLength, half = N / 2;
+    const int N = firLengthFor ((int) apvts.getRawParameterValue (EQ::qualityId)->load(), currentRate), half = N / 2;
+    if (kernelFft == nullptr || kernelFftSize != N)
+    {
+        kernelFft = std::make_unique<juce::dsp::FFT> (juce::roundToInt (std::log2 ((double) N)));
+        kernelFftSize = N;
+    }
     const double sr = currentRate;
 
     // Respuesta en magnitud de cada cadena: 0 = izquierdo, 1 = derecho, 2 = Mid, 3 = Side (el estéreo cuenta en las dos primeras y
@@ -861,6 +904,15 @@ void MedidoresEQAudioProcessor::processChunk (int n, const Params& p)
         l[i] = rl[i] * g; r[i] = rr[i] * g;
         pkL = juce::jmax (pkL, (float) std::abs (l[i])); pkR = juce::jmax (pkR, (float) std::abs (r[i]));
     }
+    if (p.dcFilter)   // quita la continua antes del EQ (paso alto de 5 Hz); el bypass no la toca
+    {
+        const double R = 1.0 - juce::MathConstants<double>::twoPi * 5.0 / currentRate;
+        for (int i = 0; i < n; ++i)
+        {
+            const double yl = l[i] - inDcX[0] + R * inDcY[0]; inDcX[0] = l[i]; inDcY[0] = yl; l[i] = yl;
+            const double yr = r[i] - inDcX[1] + R * inDcY[1]; inDcX[1] = r[i]; inDcY[1] = yr; r[i] = yr;
+        }
+    }
     inPeak[0].store (juce::jmax (inPeak[0].load(), pkL));
     inPeak[1].store (juce::jmax (inPeak[1].load(), pkR));
     inLoud.process (rl, rr, n);
@@ -918,24 +970,18 @@ void MedidoresEQAudioProcessor::processChunk (int n, const Params& p)
     }
     autoGainDb.store ((float) autoGainState);
 
+    // Bypass (el original retardado la misma latencia) y delta (solo la diferencia entre el procesado y el original; manda sobre el bypass)
     bypassSm.setTargetValue (p.bypass ? 1.0 : 0.0);
+    deltaSm.setTargetValue (p.delta ? 1.0 : 0.0);
     for (int i = 0; i < n; ++i)
     {
         const double ag = autoSm.getNextValue();
         const double bp = bypassSm.getNextValue();
-        l[i] = l[i] * ag * (1.0 - bp) + scratch[0][(size_t) i] * bp;
-        r[i] = r[i] * ag * (1.0 - bp) + scratch[1][(size_t) i] * bp;
-    }
-
-    // Dither TPDF antes de pasar a coma flotante de 32 bits (solo si el host trabaja a 16 o 24 bits).
-    if (p.dither > 0)
-    {
-        const double lsb = std::pow (2.0, 1.0 - (p.dither == 1 ? 16.0 : 24.0));
-        for (int i = 0; i < n; ++i)
-        {
-            l[i] += (randomUnit() - randomUnit()) * lsb;
-            r[i] += (randomUnit() - randomUnit()) * lsb;
-        }
+        const double dl = deltaSm.getNextValue();
+        const double pl = l[i] * ag, pr = r[i] * ag;
+        const double dryL = scratch[0][(size_t) i], dryR = scratch[1][(size_t) i];
+        l[i] = (pl * (1.0 - bp) + dryL * bp) * (1.0 - dl) + (pl - dryL) * dl;
+        r[i] = (pr * (1.0 - bp) + dryR * bp) * (1.0 - dl) + (pr - dryR) * dl;
     }
 
     // Medición de la salida
@@ -978,6 +1024,64 @@ void MedidoresEQAudioProcessor::processChunk (int n, const Params& p)
     }
 
     if (p.analyzer == 1) pushAnalyzerSamples (l, r, n);
+
+    // Utilidades de monitorización (después de los medidores, que miden la señal del programa): polaridad, intercambio L/R y suma a mono
+    if (p.polL) for (int i = 0; i < n; ++i) l[i] = -l[i];
+    if (p.polR) for (int i = 0; i < n; ++i) r[i] = -r[i];
+    if (p.monSwap) for (int i = 0; i < n; ++i) std::swap (l[i], r[i]);
+    if (p.monMono) for (int i = 0; i < n; ++i) { const double m = 0.5 * (l[i] + r[i]); l[i] = r[i] = m; }
+
+    // Fundido al cambiar de fase, calidad o sobremuestreo
+    for (int i = 0; i < n; ++i)
+    {
+        const double g = duckSm.getNextValue();
+        l[i] *= g; r[i] *= g;
+    }
+
+    // Dither TPDF antes de pasar a coma flotante de 32 bits (solo si el host trabaja a 16 o 24 bits).
+    if (p.dither > 0)
+    {
+        const double lsb = std::pow (2.0, 1.0 - (p.dither == 1 ? 16.0 : 24.0));
+        for (int i = 0; i < n; ++i)
+        {
+            l[i] += (randomUnit() - randomUnit()) * lsb;
+            r[i] += (randomUnit() - randomUnit()) * lsb;
+        }
+    }
+}
+
+void MedidoresEQAudioProcessor::applyConfigSwitch()
+{
+    const bool osChanged = wantOs != osActive;
+    const bool qualityChanged = wantQuality != firQuality;
+    const bool phaseChanged = wantPhase != phaseMode;
+
+    if (osChanged)
+    {
+        osActive = wantOs;
+        osLatency = osActive == 1 ? osLatency4 : osLatency2;
+        os2.reset(); os4.reset();
+        for (auto& d : dryDelay) d.reset();
+        satWasActive = false;
+    }
+    if (qualityChanged)
+    {
+        firQuality = wantQuality;
+        firLength = firLengthFor (firQuality, currentRate);
+        kernelsReady = false;          // el filtro FIR cambia de longitud: hasta que el temporizador lo recalcula no se usa
+        rebuildRequested = true;
+    }
+    if (phaseChanged || qualityChanged)
+    {
+        convDirect.reset();
+        convCross.reset();
+    }
+    phaseMode = wantPhase;
+    for (auto& d : bypassDelay) d.reset();   // la latencia ha cambiado
+    for (auto& d : firPass) d.reset();
+
+    ducking = false;
+    duckSm.setTargetValue (1.0);
 }
 
 void MedidoresEQAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -1022,22 +1126,25 @@ void MedidoresEQAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     p.bypass = read (EQ::bypassId) > 0.5f;
     p.autoGain = read (EQ::autoGainId) > 0.5f;
     p.extSc = read (EQ::scId) > 0.5f;
+    p.quality = (int) read (EQ::qualityId);
+    p.delta = read (EQ::deltaId) > 0.5f;
+    p.dcFilter = read (EQ::dcId) > 0.5f;
+    p.monMono = read (EQ::monMonoId) > 0.5f;
+    p.monSwap = read (EQ::monSwapId) > 0.5f;
+    p.polL = read (EQ::monPolLId) > 0.5f;
+    p.polR = read (EQ::monPolRId) > 0.5f;
     p.rms = read (EQ::detId) > 0.5f;
     useExtSc = p.extSc && scAvailable;
     detRms = p.rms;
 
-    if (p.phase != phaseMode)
+    // Cambios de configuración (fase, calidad del FIR, sobremuestreo): se aplican tras un fundido a silencio de unos 10 ms.
+    wantPhase = p.phase;
+    wantOs = p.osChoice == 1 ? 1 : 0;
+    wantQuality = p.quality;
+    if ((wantPhase != phaseMode || wantOs != osActive || wantQuality != firQuality) && ! ducking)
     {
-        if (p.phase > 0 && phaseMode == 0) { convDirect.reset(); convCross.reset(); }
-        phaseMode = p.phase;
-    }
-    if ((p.osChoice == 1 ? 1 : 0) != osActive)
-    {
-        osActive = p.osChoice == 1 ? 1 : 0;
-        osLatency = osActive == 1 ? osLatency4 : osLatency2;
-        os2.reset(); os4.reset();
-        for (auto& d : dryDelay) d.reset();
-        satWasActive = false;
+        ducking = true;
+        duckSm.setTargetValue (0.0);
     }
 
     updateTargets (false);
@@ -1053,6 +1160,7 @@ void MedidoresEQAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
             for (int i = 0; i < n; ++i) { scBuf[0][(size_t) i] = scPtr[0][start + i]; scBuf[1][(size_t) i] = scPtr[1][start + i]; }
 
         processChunk (n, p);
+        if (ducking && duckSm.getCurrentValue() < 1.0e-3) applyConfigSwitch();
 
         float* o0 = mainOut.getWritePointer (0) + start;
         for (int i = 0; i < n; ++i) o0[i] = (float) work[0][(size_t) i];

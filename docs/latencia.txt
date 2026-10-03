@@ -17,4 +17,9 @@ lineal 44.1k                  44100 Hz  informada =  8223  medida =  8223  ganan
 lineal 96k                    96000 Hz  informada = 16415  medida = 16415  ganancia = 1.000  OK
 lineal 192k                  192000 Hz  informada = 32799  medida = 32799  ganancia = 1.000  OK
 4x + lineal 192k             192000 Hz  informada = 32806  medida = 32806  ganancia = 1.707  OK
+lineal calidad baja           48000 Hz  informada =  4127  medida =  4127  ganancia = 1.000  OK
+lineal calidad alta           48000 Hz  informada = 16415  medida = 16415  ganancia = 1.000  OK
+natural calidad baja + 4x     48000 Hz  informada =  4134  medida =  4134  ganancia = 1.707  OK
+lineal calidad alta 192k     192000 Hz  informada = 65567  medida = 65567  ganancia = 1.000  OK
+filtro DC activado            48000 Hz  informada =    31  medida =    31  ganancia = 1.000  OK
 Latencia coherente en todos los casos

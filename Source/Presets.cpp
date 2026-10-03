@@ -68,9 +68,18 @@ juce::File PresetManager::folder()
     return base.getChildFile ("eCU-10 MST").getChildFile ("Presets");
 }
 
+// El nombre puede llevar carpetas ("Master/Suave"): cada trozo se limpia por separado.
 juce::File PresetManager::fileFor (const juce::String& name)
 {
-    return folder().getChildFile (juce::File::createLegalFileName (name) + ".xml");
+    juce::File file = folder();
+    const auto parts = juce::StringArray::fromTokens (name, "/", "");
+    for (int i = 0; i < parts.size(); ++i)
+    {
+        const auto part = juce::File::createLegalFileName (parts[i].trim());
+        if (part.isEmpty()) continue;
+        file = file.getChildFile (i == parts.size() - 1 ? part + ".xml" : part);
+    }
+    return file;
 }
 
 juce::StringArray PresetManager::factoryNames() const
@@ -83,8 +92,9 @@ juce::StringArray PresetManager::factoryNames() const
 juce::StringArray PresetManager::userNames() const
 {
     juce::StringArray names;
-    for (auto& f : folder().findChildFiles (juce::File::findFiles, false, "*.xml"))
-        names.add (f.getFileNameWithoutExtension());
+    const auto root = folder();
+    for (auto& f : root.findChildFiles (juce::File::findFiles, true, "*.xml"))
+        names.add (f.getRelativePathFrom (root).replaceCharacter ('\\', '/').upToLastOccurrenceOf (".xml", false, false));
     names.sort (true);
     return names;
 }
@@ -138,4 +148,22 @@ bool PresetManager::saveUser (const juce::String& name)
 bool PresetManager::removeUser (const juce::String& name)
 {
     return fileFor (name).deleteFile();
+}
+
+bool PresetManager::exportTo (const juce::File& file) const
+{
+    if (auto xml = apvts.copyState().createXml())
+        return xml->writeTo (file.hasFileExtension ("xml") ? file : file.withFileExtension ("xml"));
+    return false;
+}
+
+juce::String PresetManager::importFrom (const juce::File& file)
+{
+    if (auto xml = juce::parseXML (file))
+        if (xml->hasTagName (apvts.state.getType()))
+        {
+            const auto name = file.getFileNameWithoutExtension();
+            if (saveUser (name) && xml->writeTo (fileFor (name))) return name;
+        }
+    return {};
 }

@@ -9,7 +9,7 @@ static void setParam (MedidoresEQAudioProcessor& p, const juce::String& id, floa
         prm->setValueNotifyingHost (prm->convertTo0to1 (value));
 }
 
-struct Case { const char* name; double sampleRate; float character, drive, mix, phase, os, bypass; bool checkGain; };
+struct Case { const char* name; double sampleRate; float character, drive, mix, phase, os, bypass; bool checkGain; float quality = 1.0f; bool dc = false; };
 
 int main()
 {
@@ -36,6 +36,11 @@ int main()
         { "lineal 96k",                96000.0, 0.0f,  0.0f, 100.0f, 2.0f, 0.0f, 0.0f, true  },
         { "lineal 192k",              192000.0, 0.0f,  0.0f, 100.0f, 2.0f, 0.0f, 0.0f, true  },
         { "4x + lineal 192k",         192000.0, 1.0f, 60.0f, 100.0f, 2.0f, 1.0f, 0.0f, false },
+        { "lineal calidad baja",       48000.0, 0.0f,  0.0f, 100.0f, 2.0f, 0.0f, 0.0f, true, 0.0f },
+        { "lineal calidad alta",       48000.0, 0.0f,  0.0f, 100.0f, 2.0f, 0.0f, 0.0f, true, 2.0f },
+        { "natural calidad baja + 4x", 48000.0, 1.0f, 60.0f, 100.0f, 1.0f, 1.0f, 0.0f, false, 0.0f },
+        { "lineal calidad alta 192k", 192000.0, 0.0f,  0.0f, 100.0f, 2.0f, 0.0f, 0.0f, true, 2.0f },
+        { "filtro DC activado",        48000.0, 0.0f,  0.0f, 100.0f, 0.0f, 0.0f, 0.0f, false, 1.0f, true },
     };
 
     int failures = 0;
@@ -53,6 +58,8 @@ int main()
         setParam (proc, "phase", c.phase);
         setParam (proc, "os", c.os);
         setParam (proc, "bypass", c.bypass);
+        setParam (proc, "phase_quality", c.quality);
+        setParam (proc, "dc_filter", c.dc ? 1.0f : 0.0f);
 
         proc.prepareToPlay (c.sampleRate, blockSize);
         proc.rebuildKernels();
