@@ -110,6 +110,7 @@ private:
     void addCombo (juce::ComboBox& box, std::unique_ptr<ComboAttachment>& att, const juce::String& paramId, const juce::StringArray& items);
     void styleKnob (Knob& k);
     void applyBandColours();
+    void applyScale();
     void refreshTypeUi (int band, int type);
     void refreshPresets (const juce::String& select = {});
     void presetChosen();
@@ -128,8 +129,8 @@ private:
     juce::StringArray factoryNames, userNames;   // los ids del desplegable se reparten entre ambas listas
     juce::TextButton slotButton[4];
     juce::TextButton undoButton { "Undo" }, redoButton { "Redo" };
-    juce::ComboBox analyzerBox, speedBox, resBox, smoothBox, holdBox, rangeBox;
-    std::unique_ptr<ComboAttachment> analyzerAttachment, speedAttachment, resAttachment, smoothAttachment, holdAttachment, rangeAttachment;
+    juce::ComboBox analyzerBox, speedBox, resBox, smoothBox, holdBox, rangeBox, scaleBox;
+    std::unique_ptr<ComboAttachment> analyzerAttachment, speedAttachment, resAttachment, smoothAttachment, holdAttachment, rangeAttachment, scaleAttachment;
 
     ResponseCurve curve;
     LedMeterPair inMeter, outMeter;
@@ -143,7 +144,7 @@ private:
     std::unique_ptr<SegmentedButtons> placementButtons[EQ::NumBands];   // ST | M | S | L | R (solo campanas y shelves)
     std::unique_ptr<CycleButton> typeButton[EQ::NumBands];              // tipo de la banda
     juce::TextButton soloButton[EQ::NumBands];
-    std::unique_ptr<juce::ParameterAttachment> soloAttachment;
+    std::unique_ptr<juce::ParameterAttachment> soloAttachment, scaleCallback;
     int soloIndex = 0;
 
     Knob inKnob, outKnob, driveKnob, mixKnob, monoKnob, widthKnob;

@@ -303,6 +303,14 @@ int main()
                              at ? at->getComponentID().toRawUTF8() : "-", at ? at->getX() : 0, at ? at->getY() : 0, at ? at->getWidth() : 0, at ? at->getHeight() : 0, (int) proc.apvts.getRawParameterValue ("solo")->load()); std::printf ("  solo banda %d: alcanzable=%d activa=%d apaga=%d\n", b, reachable, engaged, released); }
         }
         check ("botones S del editor: clic alcanza, activa, marca y apaga", allOk);
+
+        // Zoom de la interfaz: el parámetro escala el editor sin cambiar su tamaño lógico
+        auto* zoom = proc.apvts.getParameter (EQ::scaleId);
+        zoom->setValueNotifyingHost (zoom->convertTo0to1 (2.0f));   // 125 %
+        const float sx = editor->getTransform().mat00;
+        check ("zoom 125 %: el editor se escala y conserva el tamaño lógico",
+               std::abs (sx - 1.25f) < 1.0e-4f && editor->getWidth() == 1280, sx);
+        zoom->setValueNotifyingHost (zoom->convertTo0to1 (1.0f));
     }
 
     // 12. Delta: solo se oye la diferencia entre el procesado y el original

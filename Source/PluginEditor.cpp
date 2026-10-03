@@ -633,6 +633,8 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
     addCombo (smoothBox, smoothAttachment, EQ::analyzerSmoothId, EQ::analyzerSmoothNames());
     addCombo (holdBox, holdAttachment, EQ::analyzerHoldId, EQ::holdNames());
     addCombo (rangeBox, rangeAttachment, EQ::rangeId, EQ::rangeNames());
+    addCombo (scaleBox, scaleAttachment, EQ::scaleId, EQ::scaleNames());
+    scaleBox.setTooltip ("Interface zoom (75 - 150 %). The plugin window resizes itself.");
     analyzerBox.setTooltip ("Spectrum analyzer: off, after the EQ (post) or before it (pre).");
     speedBox.setTooltip ("How fast the spectrum updates.");
     resBox.setTooltip ("Analyzer resolution (FFT size): Fine and Max separate the low end better.");
@@ -798,7 +800,9 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
     dynExpandButton.onClick = [this] { setDynamicsOpen (! dynOpen); };
     addAndMakeVisible (dynExpandButton);
 
+    scaleCallback = std::make_unique<juce::ParameterAttachment> (*proc.apvts.getParameter (EQ::scaleId), [this] (float v) { setScaleFactor (EQ::scaleFor ((int) std::lround (v))); });
     applyBandColours();
+    applyScale();
     setDynamicsOpen (dynOpen);
     startTimerHz (20);
 }
@@ -827,6 +831,12 @@ void MedidoresEQAudioProcessorEditor::timerCallback()
     redoButton.setEnabled (proc.undoManager.canRedo());
     for (int i = 0; i < 4; ++i)
         slotButton[i].setToggleState (i == proc.getActiveSlot(), juce::dontSendNotification);
+}
+
+// Zoom: la interfaz se dibuja siempre a 1280 px de ancho lógico y se escala; el host recibe el tamaño ya escalado.
+void MedidoresEQAudioProcessorEditor::applyScale()
+{
+    setScaleFactor (EQ::scaleFor ((int) proc.apvts.getRawParameterValue (EQ::scaleId)->load()));
 }
 
 int MedidoresEQAudioProcessorEditor::windowHeight (bool dynamicsOpen)
@@ -1219,6 +1229,8 @@ void MedidoresEQAudioProcessorEditor::resized()
     bar.removeFromLeft (10);
     helpButton.setBounds (bar.removeFromLeft (54));
 
+    scaleBox.setBounds (bar.removeFromRight (66));
+    bar.removeFromRight (6);
     rangeBox.setBounds (bar.removeFromRight (78));
     bar.removeFromRight (6);
     holdBox.setBounds (bar.removeFromRight (90));

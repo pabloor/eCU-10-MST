@@ -201,6 +201,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MedidoresEQAudioProcessor::c
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerResId, 1 }, "Analyzer resolution", EQ::analyzerResNames(), 1, view));
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerSmoothId, 1 }, "Analyzer smoothing", EQ::analyzerSmoothNames(), 0, view));
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::analyzerHoldId, 1 }, "Analyzer peak hold", EQ::holdNames(), 0, view));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::scaleId, 1 }, "Interface zoom", EQ::scaleNames(), 1, view));
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::rangeId, 1 }, "Curve range", EQ::rangeNames(), 1, view));
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::gainRangeId, 1 }, "Gain range", EQ::gainRangeNames(), 0, view));
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { EQ::soloId, 1 }, "Band solo", EQ::soloNames(), 0, view));

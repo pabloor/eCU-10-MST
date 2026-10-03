@@ -79,6 +79,7 @@ namespace EQ
     inline const char* analyzerResId = "an_res";
     inline const char* analyzerSmoothId = "an_smooth";
     inline const char* analyzerHoldId = "an_hold";
+    inline const char* scaleId = "ui_scale";      // zoom de la interfaz: 75, 100, 125, 150 %
     inline const char* rangeId = "view_range";    // rango vertical de la curva: ±6, ±12, ±24 dB
 
     inline juce::StringArray slopeNames()     { return { "6 dB/oct", "12 dB/oct", "24 dB/oct", "48 dB/oct" }; }
@@ -99,6 +100,8 @@ namespace EQ
     inline juce::StringArray analyzerResNames()    { return { "Normal", "Fine", "Max" }; }
     inline juce::StringArray analyzerSmoothNames() { return { "No smoothing", "1/6 oct", "1/3 oct" }; }
     inline juce::StringArray holdNames()      { return { "No peak", "Peak hold" }; }
+    inline juce::StringArray scaleNames()     { return { "75 %", "100 %", "125 %", "150 %" }; }
+    inline float scaleFor (int index)         { return index == 0 ? 0.75f : (index == 2 ? 1.25f : (index == 3 ? 1.5f : 1.0f)); }
     inline juce::StringArray rangeNames()     { return { utf8 ("±6 dB"), utf8 ("±12 dB"), utf8 ("±24 dB") }; }
     inline float rangeDbFor (int index)       { return index == 0 ? 6.0f : (index == 2 ? 24.0f : 12.0f); }
     inline int analyzerOrderFor (int index)   { return index == 0 ? 11 : (index == 2 ? 15 : 13); }
@@ -119,7 +122,7 @@ namespace EQ
     inline bool isViewParam (const juce::String& id)
     {
         return id == analyzerId || id == analyzerSpeedId || id == analyzerResId || id == analyzerSmoothId || id == analyzerHoldId
-               || id == rangeId || id == gainRangeId || id == soloId || id == bypassId || id == autoGainId
+               || id == rangeId || id == scaleId || id == gainRangeId || id == soloId || id == bypassId || id == autoGainId
                || id == deltaId || id == monMonoId || id == monSwapId || id == monPolLId || id == monPolRId;
     }
 

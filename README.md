@@ -36,6 +36,7 @@ Ecualizador de mastering (Audio Unit y VST3) hecho con JUCE. Es la versión para
 - 8 bandas: paso alto, shelf de graves, cuatro medias, shelf de agudos y paso bajo (6/12/24/48 dB/oct).
 - Tipos de banda: campana, **notch**, shelf, **Pultec** (realce y atenuación a la vez), **tilt** y **Baxandall**.
 - **Solo de banda** (S), **A/B/C/D** de ajustes, **deshacer / rehacer** y presets de fábrica y de usuario.
+- **Zoom de la interfaz** (75 / 100 / 125 / 150 %) desde la barra superior: la ventana se redimensiona sola y el ajuste se recuerda en cada instancia.
 
 ## Instalación (macOS)
 
