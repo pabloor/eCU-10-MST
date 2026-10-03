@@ -700,10 +700,10 @@ MedidoresEQAudioProcessorEditor::MedidoresEQAudioProcessorEditor (MedidoresEQAud
             dmodeButton[b] = std::make_unique<CycleButton> (*proc.apvts.getParameter (EQ::dmodeId (b)), EQ::dmodeNames());
             dmodeButton[b]->setTooltip ("Compress: acts when the level goes above the threshold. Expand: acts when the level falls below it.");
             addAndMakeVisible (*dmodeButton[b]);
-            addKnob (thrKnob[b], EQ::thrId (b), "Thresh", 52, b, "Level in the band at which the dynamics start to act.");
-            addKnob (ratioKnob[b], EQ::ratioId (b), "Ratio", 52, b, "How strongly the dynamics respond past the threshold.");
-            addKnob (attackKnob[b], EQ::attackId (b), "Attack", 52, b, "How fast the dynamics start to act.");
-            addKnob (releaseKnob[b], EQ::releaseId (b), "Release", 52, b, "How fast the band returns to its normal gain.");
+            addKnob (thrKnob[b], EQ::thrId (b), "Thr", 43, b, "Level in the band at which the dynamics start to act.");
+            addKnob (ratioKnob[b], EQ::ratioId (b), "Ratio", 43, b, "How strongly the dynamics respond past the threshold.");
+            addKnob (attackKnob[b], EQ::attackId (b), "Atk", 43, b, "How fast the dynamics start to act.");
+            addKnob (releaseKnob[b], EQ::releaseId (b), "Rel", 43, b, "How fast the band returns to its normal gain.");
         }
     }
 
@@ -1291,11 +1291,11 @@ void MedidoresEQAudioProcessorEditor::resized()
 
         dynToggle[b].setBounds (x + 8, dynRow.getY() + 2, colW - 12, 26);
         dynMeter[b]->setBounds (x + 10, dynRow.getY() + 30, colW - 20, 16);
-        const int knobRowH = 60;
-        place (thrKnob[b],     { x,            dynRow.getY() + 50,  colW / 2, knobRowH });
-        place (ratioKnob[b],   { x + colW / 2, dynRow.getY() + 50,  colW / 2, knobRowH });
-        place (attackKnob[b],  { x,            dynRow.getY() + 50 + knobRowH, colW / 2, knobRowH });
-        place (releaseKnob[b], { x + colW / 2, dynRow.getY() + 50 + knobRowH, colW / 2, knobRowH });
+        const int knobRowH = 60, cellW = (colW - 12) / 2, leftX = x + 5, rightX = x + 5 + cellW + 2;   // cells inside the section border, not touching
+        place (thrKnob[b],     { leftX,  dynRow.getY() + 50, cellW, knobRowH });
+        place (ratioKnob[b],   { rightX, dynRow.getY() + 50, cellW, knobRowH });
+        place (attackKnob[b],  { leftX,  dynRow.getY() + 50 + knobRowH, cellW, knobRowH });
+        place (releaseKnob[b], { rightX, dynRow.getY() + 50 + knobRowH, cellW, knobRowH });
         dmodeButton[b]->setBounds (x + 8, dynRow.getY() + 50 + 2 * knobRowH + 4, colW - 16, 22);
 
         typeButton[b]->setBounds (x + 8, comboRow.getY() + 8, colW - 16, 24);
