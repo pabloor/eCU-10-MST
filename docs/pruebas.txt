@@ -37,4 +37,5 @@ el estado guardado recupera la ranura activa               OK  (1.000)
 el plugin acepta la entrada de sidechain                   OK  (0.000)
 detector interno: la señal floja no activa la dinamica    OK  (0.003)
 detector externo: el sidechain fuerte activa la dinamica en la señal floja OK  (-8.997)
+botones S del editor: clic alcanza, activa, marca y apaga  OK  (0.000)
 Todas las pruebas funcionales correctas
